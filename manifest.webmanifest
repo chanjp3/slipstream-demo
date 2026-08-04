@@ -1,0 +1,15 @@
+{
+  "name": "Slipstream Demo — Private Charter Marketplace",
+  "short_name": "Slipstream Demo",
+  "description": "Post your trip once. FAA-verified operators compete with sealed quotes.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#16233b",
+  "theme_color": "#2E6BE6",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
