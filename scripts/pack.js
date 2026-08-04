@@ -1018,6 +1018,24 @@ function patchMapLegend(doc) {
   return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
 }
 
+// Move Leaflet's zoom +/- to the bottom-right: the app's prompt bar overlays
+// the default top-left position.
+function patchMapZoomPos(doc) {
+  const mOpen = '<script type="__bundler/template">';
+  const ms = doc.indexOf(mOpen);
+  if (ms === -1) return { doc, changed: false };
+  const mStart = ms + mOpen.length;
+  const mEnd = doc.indexOf('</script>', mStart);
+  let tpl = JSON.parse(doc.slice(mStart, mEnd));
+  const OLD = "var map = L.map('map', { worldCopyJump:true }).setView([38,-30], 3);";
+  if (!tpl.includes(OLD)) return { doc, changed: false };
+  tpl = tpl.replace(OLD,
+    "var map = L.map('map', { worldCopyJump:true, zoomControl:false }).setView([38,-30], 3);\n"
+    + "L.control.zoom({ position: 'bottomright' }).addTo(map);");
+  const tjson = JSON.stringify(tpl).replace(/<\//g, '<\\/');
+  return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
+}
+
 // Zoom-scaled marker cap: 25 circles at world view, 5x (125) when zoomed in.
 function patchMapZoomCap(doc) {
   const mOpen = '<script type="__bundler/template">';
@@ -1138,8 +1156,10 @@ function swapAirports(doc) {
       if (scaled.changed) console.log('applied zoom-scaled marker cap');
       const legended = patchMapLegend(scaled.doc);
       if (legended.changed) console.log('applied airport-category colors + legend');
-      if (res.changed || mapped.changed || styled.changed || scaled.changed || legended.changed) {
-        entry.data = zlib.gzipSync(Buffer.from(legended.doc, 'utf8')).toString('base64');
+      const zoomed = patchMapZoomPos(legended.doc);
+      if (zoomed.changed) console.log('moved map zoom control to bottom-right');
+      if (res.changed || mapped.changed || styled.changed || scaled.changed || legended.changed || zoomed.changed) {
+        entry.data = zlib.gzipSync(Buffer.from(zoomed.doc, 'utf8')).toString('base64');
         entry.compressed = true;
         changed = true;
       }
