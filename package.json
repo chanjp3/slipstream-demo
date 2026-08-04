@@ -1,0 +1,13 @@
+{
+  "name": "slipstream",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Slipstream charter marketplace — design prototype gated behind client/operator logins, deployed on Cloudflare Workers",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.113.0"
+  }
+}

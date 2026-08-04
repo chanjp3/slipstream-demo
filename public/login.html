@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in — Slipstream</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Albert Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #2E6BE6;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #ffffff; border-radius: 20px; padding: 40px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 24px 60px rgba(10, 30, 80, 0.35);
+    }
+    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .logo-mark {
+      width: 34px; height: 34px; border-radius: 9px; background: #2E6BE6;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-mark svg { width: 20px; height: 20px; }
+    .logo-name { font-size: 20px; font-weight: 800; color: #16233b; letter-spacing: -0.3px; }
+    .tagline { color: #68758d; font-size: 14px; margin-bottom: 28px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #4a5a76; margin: 16px 0 6px; }
+    input {
+      width: 100%; padding: 12px 14px; font-size: 15px; font-family: inherit;
+      border: 1px solid #dde5f0; border-radius: 10px; color: #16233b; outline: none;
+      transition: border-color .15s;
+    }
+    input:focus { border-color: #2E6BE6; }
+    button {
+      width: 100%; margin-top: 24px; padding: 13px; font-size: 15px; font-weight: 700;
+      font-family: inherit; color: #fff; background: #2E6BE6; border: none;
+      border-radius: 10px; cursor: pointer; transition: background .15s;
+    }
+    button:hover { background: #2558c4; }
+    button:disabled { background: #a9b4c8; cursor: default; }
+    .error {
+      display: none; margin-top: 16px; padding: 10px 14px; font-size: 13px;
+      background: #fdecec; color: #b3261e; border-radius: 8px;
+    }
+    .alt { margin-top: 20px; text-align: center; font-size: 14px; color: #68758d; }
+    .alt a { color: #2E6BE6; font-weight: 600; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+          <rect x="38" y="42" width="46" height="6" rx="3" fill="#ffffff" transform="rotate(-20 60 45)"></rect>
+          <rect x="32" y="52" width="26" height="6" rx="3" fill="#a8c4f4" transform="rotate(-20 45 55)"></rect>
+        </svg>
+      </div>
+      <div class="logo-name">Slipstream</div>
+    </div>
+    <div class="tagline">Charter marketplace — sign in to continue</div>
+    <form id="form">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <div class="error" id="error"></div>
+      <button type="submit" id="submit">Sign in</button>
+    </form>
+    <div class="alt">New to Slipstream? <a href="/register">Create an account</a></div>
+  </div>
+  <script>
+    const form = document.getElementById('form');
+    const errEl = document.getElementById('error');
+    const btn = document.getElementById('submit');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errEl.style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Sign-in failed');
+        location.href = '/app';
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

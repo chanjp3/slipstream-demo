@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slipstream — Private Charter Marketplace</title>
+  <meta name="description" content="Post your trip once. Vetted operators send you sealed quotes — they never see each other's bids.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Albert Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #2E6BE6; color: #fff; min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 32px; max-width: 1100px; width: 100%; margin: 0 auto;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-mark {
+      width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,.14);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-mark svg { width: 22px; height: 22px; }
+    .logo-name { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
+    .nav a.signin {
+      color: #fff; text-decoration: none; font-weight: 600; font-size: 15px;
+      padding: 10px 20px; border: 1.5px solid rgba(255,255,255,.35); border-radius: 10px;
+      transition: background .15s;
+    }
+    .nav a.signin:hover { background: rgba(255,255,255,.1); }
+    .hero {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 48px 24px 80px; max-width: 780px; margin: 0 auto;
+    }
+    h1 { font-size: clamp(34px, 5.5vw, 56px); font-weight: 800; letter-spacing: -1px; line-height: 1.08; }
+    .sub { margin-top: 18px; font-size: clamp(16px, 2vw, 19px); color: #cfdefa; line-height: 1.55; max-width: 560px; }
+    .ctas { margin-top: 36px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+    .ctas a {
+      text-decoration: none; font-weight: 700; font-size: 16px;
+      padding: 15px 28px; border-radius: 12px; transition: transform .12s, box-shadow .12s;
+    }
+    .ctas a.primary { background: #fff; color: #16233b; box-shadow: 0 10px 30px rgba(10,30,80,.3); }
+    .ctas a.secondary { background: rgba(255,255,255,.12); color: #fff; border: 1.5px solid rgba(255,255,255,.3); }
+    .ctas a:hover { transform: translateY(-1px); }
+    .points {
+      margin-top: 56px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px; width: 100%; max-width: 720px;
+    }
+    .pt { background: rgba(255,255,255,.1); border-radius: 14px; padding: 18px; text-align: left; }
+    .pt b { display: block; font-size: 15px; margin-bottom: 5px; }
+    .pt span { font-size: 13.5px; color: #cfdefa; line-height: 1.45; }
+    footer { text-align: center; padding: 20px; font-size: 13px; color: #a8c4f4; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+          <rect x="38" y="42" width="46" height="6" rx="3" fill="#ffffff" transform="rotate(-20 60 45)"></rect>
+          <rect x="32" y="52" width="26" height="6" rx="3" fill="#a8c4f4" transform="rotate(-20 45 55)"></rect>
+        </svg>
+      </div>
+      <div class="logo-name">Slipstream</div>
+    </div>
+    <a class="signin" href="https://slipstream.chandler-850.workers.dev/login">Sign in</a>
+  </div>
+  <div class="hero">
+    <h1>Charter a jet the way it should work.</h1>
+    <div class="sub">Post your trip once. Vetted operators send you sealed quotes — they never see each other's bids. Compare, chat, and book in one place.</div>
+    <div class="ctas">
+      <a class="primary" href="https://slipstream.chandler-850.workers.dev/register">Request a charter</a>
+      <a class="secondary" href="https://slipstream.chandler-850.workers.dev/register">I'm an operator</a>
+    </div>
+    <div class="points">
+      <div class="pt"><b>Sealed bidding</b><span>Operators compete on your trip without seeing each other's prices.</span></div>
+      <div class="pt"><b>Map-first planning</b><span>Pick airports on an interactive map — hubs, regionals, and islands.</span></div>
+      <div class="pt"><b>Compare &amp; book</b><span>Side-by-side quotes, direct messaging, one-tap acceptance.</span></div>
+    </div>
+  </div>
+  <footer>© 2026 Slipstream</footer>
+</body>
+</html>

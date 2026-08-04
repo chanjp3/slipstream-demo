@@ -1,0 +1,13 @@
+# Pages serves only the public landing page; everything sensitive lives on the Worker.
+# The app bundle and auth pages redirect to the Worker (which enforces login).
+/public/* https://slipstream.chandler-850.workers.dev/ 302
+/login https://slipstream.chandler-850.workers.dev/login 302
+/register https://slipstream.chandler-850.workers.dev/register 302
+/app https://slipstream.chandler-850.workers.dev/app 302
+# Source and config files aren't part of the public site.
+/src/* / 302
+/db/* / 302
+/scripts/* / 302
+/wrangler.jsonc / 302
+/package.json / 302
+/README.md / 302
