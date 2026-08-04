@@ -174,6 +174,26 @@
     .foot-links { display: flex; gap: 22px; font-weight: 600; }
     .foot-links a:hover { color: var(--navy); }
 
+    /* mobile breathing room */
+    @media (max-width: 640px) {
+      .wrap { padding: 0 22px; }
+      section { padding: 56px 0; }
+      .hero-inner { padding: 50px 0 58px; }
+      h1 { letter-spacing: -.8px; }
+      .hero-sub { font-size: 15.5px; }
+      .step, .op-card { padding: 22px 20px; }
+      .price-card { padding: 26px 22px; }
+      .legs { padding: 32px 22px; gap: 28px; }
+      .final { padding: 48px 22px; }
+      .stats-inner { gap: 16px 14px; padding: 24px 0; }
+      .stat b { font-size: 20px; }
+      .trust-item { gap: 13px; }
+      .btn-big { padding: 14px 22px; font-size: 15px; width: 100%; text-align: center; }
+      .hero-ctas { flex-direction: column; }
+      summary { font-size: 15px; padding: 17px 2px; }
+      .foot-inner { flex-direction: column; align-items: flex-start; gap: 14px; }
+    }
+
     /* reveal animation */
     .rv { opacity: 0; transform: translateY(22px); transition: opacity .6s ease, transform .6s ease; }
     .rv.in { opacity: 1; transform: none; }

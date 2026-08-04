@@ -56,6 +56,66 @@ if (!newTemplate.includes('manifest.webmanifest')) {
   console.log('applied PWA + mobile-shim markup patch');
 }
 
+// Mobile map expand: on phone widths an "Expand map" button floats over the
+// request-screen map; tapping it makes the map (with its airport search
+// panel) fullscreen. Injected as a survives-document-replacement script.
+const MAP_EXPAND = `<style>
+.slip-map-btn{display:none}
+@media (max-width:860px){
+  .slip-map-btn{display:flex;position:absolute;top:10px;left:10px;z-index:1200;background:#16233b;color:#fff;border:none;border-radius:10px;padding:9px 14px;font:700 12.5px system-ui;box-shadow:0 6px 18px rgba(10,20,40,.35);align-items:center;gap:6px;cursor:pointer}
+  .slip-map-full{position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;z-index:4000 !important;background:#fff}
+  .slip-map-full iframe{min-height:100vh !important;height:100vh !important}
+}
+</style>
+<scr` + `ipt>
+(function(){
+  function ensure(){
+    if(window.innerWidth>860)return;
+    var frame=document.querySelector('[data-screen-label*="New request"] iframe');
+    if(!frame)return;
+    var host=frame.parentElement;
+    if(!host||host.querySelector('.slip-map-btn'))return;
+    if(getComputedStyle(host).position==='static')host.style.position='relative';
+    var b=document.createElement('button');
+    b.className='slip-map-btn';
+    b.textContent='\\u26f6 Expand map';
+    b.addEventListener('click',function(){
+      var full=host.classList.toggle('slip-map-full');
+      b.textContent=full?'\\u2715 Close map':'\\u26f6 Expand map';
+      document.body.style.overflow=full?'hidden':'';
+    });
+    host.appendChild(b);
+  }
+  setInterval(ensure,800);
+})();
+</scr` + `ipt>
+</head>`;
+
+if (!newTemplate.includes('slip-map-btn')) {
+  if (!newTemplate.includes('</head>')) throw new Error('template head close not found');
+  newTemplate = newTemplate.replace('</head>', MAP_EXPAND);
+  console.log('applied mobile map-expand markup patch');
+}
+
+// The map pane collapses to 0 height when the desktop grid stacks — give the
+// iframe's host a real height on phones.
+const MAP_HEIGHT_FIX = `<style>
+@media (max-width:860px){
+  [data-screen-label] div:has(> iframe):not(.slip-map-full){min-height:60vh !important;height:60vh !important;position:relative !important}
+}
+</style>
+</head>`;
+// upgrade older height rule to exclude the fullscreen state
+const HF_OLD = '[data-screen-label] div:has(> iframe){min-height:60vh !important;height:60vh !important;position:relative !important}';
+if (newTemplate.includes(HF_OLD)) {
+  newTemplate = newTemplate.replace(HF_OLD, '[data-screen-label] div:has(> iframe):not(.slip-map-full){min-height:60vh !important;height:60vh !important;position:relative !important}');
+  console.log('upgraded map-height rule');
+}
+if (!newTemplate.includes(':has(> iframe)')) {
+  newTemplate = newTemplate.replace('</head>', MAP_HEIGHT_FIX);
+  console.log('applied mobile map-height fix');
+}
+
 // Account menu: make the header avatar clickable with a profile/settings/logout dropdown.
 const AVATAR = '<div style="width:32px;height:32px;border-radius:50%;background:#16233b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">{{ avatarInitials }}</div>';
 const ACCOUNT_MENU = `<div style="position:relative">
@@ -1006,6 +1066,36 @@ const swapped = swapAirports(out);
 if (swapped.changed) {
   out = swapped.doc;
   console.log('swapped airports dataset into bundle manifests');
+}
+
+// Outer-document script: inline scripts inside the design template never
+// execute (the bundler swaps the document via DOM insertion), but the outer
+// page's scripts run on load and their timers survive the swap — same trick
+// as the demo toolbar. Handles SW registration + the mobile map-expand button.
+if (!out.includes('__slipOuterBoot')) {
+  const boot = '<script>window.__slipOuterBoot=1;(function(){'
+    + 'if("serviceWorker" in navigator){try{navigator.serviceWorker.register("/sw.js")}catch(e){}}'
+    + 'function ensure(){'
+    + 'if(window.innerWidth>860)return;'
+    + 'var frame=document.querySelector(\'[data-screen-label*="New request"] iframe\');'
+    + 'if(!frame)return;'
+    + 'var host=frame.parentElement;'
+    + 'if(!host||host.querySelector(".slip-map-btn"))return;'
+    + 'if(getComputedStyle(host).position==="static")host.style.position="relative";'
+    + 'var b=document.createElement("button");'
+    + 'b.className="slip-map-btn";'
+    + 'b.textContent="\\u26f6 Expand map";'
+    + 'b.addEventListener("click",function(){'
+    + 'var full=host.classList.toggle("slip-map-full");'
+    + 'b.textContent=full?"\\u2715 Close map":"\\u26f6 Expand map";'
+    + 'document.body.style.overflow=full?"hidden":"";'
+    + '});'
+    + 'host.appendChild(b);'
+    + '}'
+    + 'setInterval(ensure,800);'
+    + '})();</scr' + 'ipt>\n';
+  out = out.replace('</script>\n</body>\n</html>', '</script>\n' + boot + '</body>\n</html>');
+  console.log('applied outer-boot script (SW + mobile map expand)');
 }
 
 fs.writeFileSync(bundlePath, out);
