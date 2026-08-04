@@ -91,10 +91,28 @@ const MAP_EXPAND = `<style>
 </scr` + `ipt>
 </head>`;
 
-if (!newTemplate.includes('slip-map-btn')) {
-  if (!newTemplate.includes('</head>')) throw new Error('template head close not found');
-  newTemplate = newTemplate.replace('</head>', MAP_EXPAND);
-  console.log('applied mobile map-expand markup patch');
+// OBSOLETE: the expand-button flow is superseded by tap-a-location-box. Strip
+// the old injected script (it turns out template scripts DO execute) but keep
+// the .slip-map-full CSS it carried, which the new flow still uses.
+const MAP_EXPAND_KEEP_CSS = `<style>
+@media (max-width:860px){
+  .slip-map-full{position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;z-index:4000 !important;background:#fff}
+  .slip-map-full iframe{min-height:100vh !important;height:100vh !important}
+}
+</style>
+</head>`;
+{
+  const body = MAP_EXPAND.slice(0, -'</head>'.length);
+  let stripped = 0;
+  while (newTemplate.includes(body)) {
+    newTemplate = newTemplate.replace(body, '');
+    stripped++;
+  }
+  if (stripped) console.log('stripped', stripped, 'obsolete map-expand block(s)');
+  if (!newTemplate.includes('.slip-map-full{position:fixed')) {
+    newTemplate = newTemplate.replace('</head>', MAP_EXPAND_KEEP_CSS);
+    console.log('applied fullscreen-map CSS');
+  }
 }
 
 // The map pane collapses to 0 height when the desktop grid stacks — give the
@@ -279,12 +297,44 @@ if (!newTemplate.includes('{{ apListTitle }}')) {
 const MAP_HOST_OPEN = '<div style="position:relative;min-width:0">';
 if (!newTemplate.includes('{{ mapHostClass }}')) {
   if (newTemplate.split(MAP_HOST_OPEN).length - 1 !== 1) throw new Error('map host anchor not unique — template changed?');
-  newTemplate = newTemplate.replace(MAP_HOST_OPEN,
-    `<div class="{{ mapHostClass }}" style="position:relative;min-width:0">
-      <sc-if value="{{ mapCloseShow }}" hint-placeholder-val="{{ false }}">
-      <button sc-camel-on-click="{{ closeMap }}" aria-label="Close map" style="position:absolute;top:14px;left:14px;z-index:1300;width:40px;height:40px;border-radius:12px;background:#16233b;color:#fff;border:none;cursor:pointer;font-size:15px;box-shadow:0 8px 24px rgba(10,20,40,.35);padding:0">✕</button>
-      </sc-if>`);
+  newTemplate = newTemplate.replace(MAP_HOST_OPEN, '<div class="{{ mapHostClass }}" style="position:relative;min-width:0">');
   console.log('applied mobile map-flow markup patch');
+}
+
+// The standalone close button overlapped the prompt bar — the ✕ lives inside
+// the prompt bar now. Remove the old floating button from packed templates.
+const OLD_MAP_CLOSE = `<sc-if value="{{ mapCloseShow }}" hint-placeholder-val="{{ false }}">
+      <button sc-camel-on-click="{{ closeMap }}" aria-label="Close map" style="position:absolute;top:14px;left:14px;z-index:1300;width:40px;height:40px;border-radius:12px;background:#16233b;color:#fff;border:none;cursor:pointer;font-size:15px;box-shadow:0 8px 24px rgba(10,20,40,.35);padding:0">✕</button>
+      </sc-if>`;
+if (newTemplate.includes(OLD_MAP_CLOSE)) {
+  newTemplate = newTemplate.replace(OLD_MAP_CLOSE, '');
+  console.log('removed old floating map-close button');
+}
+
+// Prompt bar: cap its width so it never runs under the airports panel
+// (desktop) or the magnifier (mobile), and host the map ✕ inside it.
+const PROMPT_OPEN = '<div style="position:absolute;top:14px;left:14px;z-index:1000;display:flex;align-items:center;gap:9px;background:#16233b;color:#fff;border-radius:10px;padding:10px 15px;box-shadow:0 4px 16px rgba(22,35,59,.3);max-width:340px">';
+if (!newTemplate.includes('slip-prompt')) {
+  if (!newTemplate.includes(PROMPT_OPEN)) throw new Error('map prompt bar anchor not found — template changed?');
+  newTemplate = newTemplate.replace(PROMPT_OPEN,
+    `<div class="slip-prompt" style="position:absolute;top:14px;left:14px;z-index:1000;display:flex;align-items:center;gap:9px;background:#16233b;color:#fff;border-radius:10px;padding:10px 15px;box-shadow:0 4px 16px rgba(22,35,59,.3);max-width:340px">
+        <sc-if value="{{ mapCloseShow }}" hint-placeholder-val="{{ false }}">
+        <button sc-camel-on-click="{{ closeMap }}" aria-label="Close map" style="flex:none;width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.16);color:#fff;border:none;cursor:pointer;font-size:12px;padding:0">✕</button>
+        </sc-if>`);
+  newTemplate = newTemplate.replace('</head>',
+    '<style>.slip-prompt{box-sizing:border-box;max-width:min(340px,calc(100% - 320px)) !important}'
+    + '@media (max-width:860px){.slip-prompt{max-width:calc(100vw - 88px) !important}}</style>\n</head>');
+  console.log('applied prompt-bar layout patch');
+}
+// slip-prompt vw upgrade: containing-block % proved unreliable in fullscreen
+if (newTemplate.includes('.slip-prompt{max-width:calc(100% - 88px) !important}')) {
+  newTemplate = newTemplate.replace('.slip-prompt{max-width:calc(100% - 88px) !important}', '.slip-prompt{max-width:calc(100vw - 88px) !important}');
+  console.log('upgraded prompt-bar mobile cap to vw');
+}
+// border-box upgrade: app has no global reset, padding sat on top of max-width
+if (newTemplate.includes('<style>.slip-prompt{max-width:min(340px')) {
+  newTemplate = newTemplate.replace('<style>.slip-prompt{max-width:min(340px', '<style>.slip-prompt{box-sizing:border-box;max-width:min(340px');
+  console.log('upgraded prompt-bar to border-box');
 }
 const HIDDEN_CSS = '<style>.slip-map-hidden{display:none !important}</style>\n</head>';
 if (!newTemplate.includes('.slip-map-hidden{display:none')) {
