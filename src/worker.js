@@ -547,6 +547,11 @@ async function getTeam(env, me) {
 async function apiCreateInvite(env, me) {
   const err = requireOrgAdmin(me);
   if (err) return err;
+  const adminPlan = (await env.DB.prepare('SELECT plan FROM users WHERE id = ?').bind(me.orgId).first())?.plan || 'free';
+  if (adminPlan !== 'pro') {
+    const seats = await env.DB.prepare('SELECT COUNT(*) AS n FROM users WHERE org_id = ?').bind(me.orgId).first();
+    if (seats.n >= 3) return json({ error: 'Free plan includes 3 team seats — Pro removes the limit.' }, 403);
+  }
   const open = await env.DB.prepare(
     'SELECT COUNT(*) AS n FROM org_invites WHERE org_id = ? AND used_by IS NULL'
   ).bind(me.orgId).first();
@@ -821,6 +826,16 @@ async function apiBootstrap(env, me) {
   const adminRow = await env.DB.prepare('SELECT plan FROM users WHERE id = ?').bind(me.orgId).first();
   meOut.plan = adminRow?.plan || 'free';
   meOut.orgRole = me.orgRole;
+  if (meOut.plan === 'pro') {
+    // Pro perk: win-rate analytics across the org's bidding history.
+    const st = await env.DB.prepare(
+      `SELECT COUNT(*) AS sent,
+              COALESCE(SUM(CASE WHEN q.id = r.accepted_quote_id THEN 1 ELSE 0 END), 0) AS won
+       FROM quotes q JOIN requests r ON r.id = q.request_id
+       WHERE q.operator_id IN (SELECT id FROM users WHERE org_id = ?)`
+    ).bind(me.orgId).first();
+    meOut.stats = { sent: st.sent, won: st.won };
+  }
   const profile = await getOperatorProfile(env, me.orgId);
   profile.team = await getTeam(env, me);
   return json({
@@ -903,6 +918,7 @@ async function clientRequests(env, me) {
   const quotes = (await env.DB.prepare(
     `SELECT q.*, u.name AS operator_name,
             p.company AS op_company, p.cert_number, p.d085_name, p.safety_program,
+            (SELECT plan FROM users WHERE id = COALESCE(u.org_id, u.id)) AS org_plan,
             (SELECT ROUND(AVG(rv.stars), 1) FROM reviews rv
              WHERE rv.operator_org = COALESCE(u.org_id, u.id)) AS avg_rating,
             (SELECT COUNT(*) FROM reviews rv
@@ -944,9 +960,13 @@ async function clientRequests(env, me) {
     })(),
     // Operators are anonymous until acceptance: only the accepted quote's
     // operator is revealed; the rest stay "Operator A/B/C" forever.
-    quotes: quotes.filter((q) => q.request_id === r.id).map((q, i) =>
-      quoteShape(q, { revealed: r.accepted_quote_id === q.id, label: 'Operator ' + String.fromCharCode(65 + i) })
-    ),
+    // Pro perk: priority placement — Pro operators' quotes list first.
+    quotes: quotes
+      .filter((q) => q.request_id === r.id)
+      .sort((a, b) => ((b.org_plan === 'pro') - (a.org_plan === 'pro')) || (a.created_at < b.created_at ? -1 : 1))
+      .map((q, i) =>
+        quoteShape(q, { revealed: r.accepted_quote_id === q.id, label: 'Operator ' + String.fromCharCode(65 + i) })
+      ),
   }));
 }
 
@@ -1245,7 +1265,11 @@ async function apiPostEmptyLeg(request, env, me) {
   const open = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM empty_legs WHERE operator_org = ? AND status = 'open'"
   ).bind(me.orgId).first();
-  if (open.n >= 20) return json({ error: 'Limit reached (20 open empty legs) — remove some first' }, 400);
+  const legPlan = (await env.DB.prepare('SELECT plan FROM users WHERE id = ?').bind(me.orgId).first())?.plan || 'free';
+  const legCap = legPlan === 'pro' ? 20 : 3;
+  if (open.n >= legCap) {
+    return json({ error: 'Limit reached (' + legCap + ' open empty legs on your plan' + (legCap === 3 ? ' — Pro raises it to 20' : '') + ')' }, 400);
+  }
 
   await env.DB.prepare(
     `INSERT INTO empty_legs (operator_org, created_by, from_code, to_code, date, time, aircraft, seats, price, note)

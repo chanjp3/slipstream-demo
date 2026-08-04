@@ -595,7 +595,12 @@ class Component extends DCLogic {
         : 'Free plan',
       planDetail: !this.me ? ''
         : (realRole === 'operator'
-          ? (this.me.plan === 'pro' ? 'Instant access to new requests' : 'New requests visible after a 15-min delay')
+          ? (this.me.plan === 'pro'
+            ? 'Instant access · priority placement' + (this.me.stats
+              ? ' · ' + this.me.stats.sent + ' quotes, ' + this.me.stats.won + ' won'
+                + (this.me.stats.sent ? ' (' + Math.round(this.me.stats.won / this.me.stats.sent * 100) + '%)' : '')
+              : '')
+            : 'New requests delayed 15 min · 3 team seats · 3 empty-leg slots')
           : (this.me.plan === 'plus' ? 'Request deposits waived' : 'Refundable deposit per request ($150–500)'))
           + (this.me && this.me.orgRole === 'member' ? ' · managed by your team admin' : ''),
       planIsFree: !!this.me && this.me.plan === 'free' && this.me.orgRole !== 'member',
@@ -608,7 +613,7 @@ class Component extends DCLogic {
       coName: realRole === 'operator' ? 'Operator Pro' : 'Traveler Plus',
       coPrice: realRole === 'operator' ? '$299' : '$79',
       coFeatures: realRole === 'operator'
-        ? [{ label: 'See new requests instantly (free tier waits 15 min)' }, { label: 'First to quote wins more trips' }, { label: 'Verified operator badge' }, { label: 'Priority placement in quote lists' }]
+        ? [{ label: 'See new requests instantly (free tier waits 15 min)' }, { label: 'Priority placement — your quotes list first' }, { label: 'Win-rate analytics on your bidding' }, { label: 'Unlimited team seats (free: 3)' }, { label: '20 empty-leg slots (free: 3)' }]
         : [{ label: 'Request deposits waived on every trip' }, { label: 'Empty-leg deal alerts' }, { label: 'Priority support' }, { label: 'Cancellation assistance' }],
       coComplete: () => this.completeCheckout(),
       coCancel: () => this.setState({ checkoutOpen: false }),
