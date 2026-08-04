@@ -44,7 +44,7 @@ class Component extends DCLogic {
       legFormOpen: false, legFrom: '', legTo: '', legDate: '', legTime: '09:00',
       legAircraft: 'xls', legPrice: '', legNote: '', legMsg: '',
       depOpen: false, depAmount: 0,
-      apOpen: false
+      apOpen: false, mapOpen: false
     };
     this.DEPOSIT_TIERS = { prop: 150, light: 150, mid: 250, smid: 250, heavy: 500, ulr: 500 };
     this.opProfile = null;
@@ -162,7 +162,10 @@ class Component extends DCLogic {
     let next = { ...active };
     if (active.side === 'from') next = { leg: active.leg, side: 'to' };
     else if (active.leg < legs.length - 1) next = { leg: active.leg + 1, side: legs[active.leg + 1].from ? 'to' : 'from' };
-    this.setState({ legs, active: next }, () => this.drawRoutes());
+    // Mobile: the map closes after each pick; the next location box reopens it.
+    const patch = { legs, active: next };
+    if (window.innerWidth <= 860) { patch.mapOpen = false; patch.apOpen = false; patch.apSearch = ''; }
+    this.setState(patch, () => this.drawRoutes());
   }
   setTrip(t) {
     let legs = this.state.legs;
@@ -446,8 +449,8 @@ class Component extends DCLogic {
         fromCodeColor: l.from ? '#16233b' : '#a9b4c8', toCodeColor: l.to ? '#16233b' : '#a9b4c8',
         fromBorder: isActive('from') ? 'solid #2E6BE6' : (l.from ? 'solid #dde5f0' : 'dashed #b9c8e0'),
         toBorder: isActive('to') ? 'solid #2E6BE6' : (l.to ? 'solid #dde5f0' : 'dashed #b9c8e0'),
-        onFromClick: () => this.setState({ active: { leg: i, side: 'from' } }),
-        onToClick: () => this.setState({ active: { leg: i, side: 'to' } }),
+        onFromClick: () => this.setState({ active: { leg: i, side: 'from' }, ...(window.innerWidth <= 860 ? { mapOpen: true } : {}) }),
+        onToClick: () => this.setState({ active: { leg: i, side: 'to' }, ...(window.innerWidth <= 860 ? { mapOpen: true } : {}) }),
         onSwap: () => { const legs = s.legs.map((x, j) => j === i ? { ...x, from: x.to, to: x.from } : x); this.setState({ legs }, () => this.drawRoutes()); },
         date: l.date, time: l.time,
         onDate: e => { const v = e.target.value; this.setState({ legs: s.legs.map((x, j) => j === i ? { ...x, date: v } : x) }); },
@@ -738,6 +741,10 @@ class Component extends DCLogic {
       onApSearch: e => this.setState({ apSearch: e.target.value }),
       apSearchActive: !!q,
       clearApSearch: () => this.setState({ apSearch: '' }),
+      // mobile: map hidden until a location box is tapped, fullscreen while picking
+      mapHostClass: !isMobile ? '' : (s.mapOpen ? 'slip-map-full' : 'slip-map-hidden'),
+      mapCloseShow: isMobile && s.mapOpen,
+      closeMap: () => this.setState({ mapOpen: false, apOpen: false, apSearch: '' }),
       // mobile: panel collapses to a magnifier button until opened
       apFabShow: isMobile && !s.apOpen,
       openApPanel: () => this.setState({ apOpen: true }),

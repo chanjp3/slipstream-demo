@@ -274,6 +274,24 @@ if (!newTemplate.includes('{{ apListTitle }}')) {
   console.log('applied airport-search markup patch');
 }
 
+// Mobile map flow: the map pane is hidden on phones until a FROM/TO location
+// box is tapped, then it opens fullscreen; picking an airport closes it.
+const MAP_HOST_OPEN = '<div style="position:relative;min-width:0">';
+if (!newTemplate.includes('{{ mapHostClass }}')) {
+  if (newTemplate.split(MAP_HOST_OPEN).length - 1 !== 1) throw new Error('map host anchor not unique — template changed?');
+  newTemplate = newTemplate.replace(MAP_HOST_OPEN,
+    `<div class="{{ mapHostClass }}" style="position:relative;min-width:0">
+      <sc-if value="{{ mapCloseShow }}" hint-placeholder-val="{{ false }}">
+      <button sc-camel-on-click="{{ closeMap }}" aria-label="Close map" style="position:absolute;top:14px;left:14px;z-index:1300;width:40px;height:40px;border-radius:12px;background:#16233b;color:#fff;border:none;cursor:pointer;font-size:15px;box-shadow:0 8px 24px rgba(10,20,40,.35);padding:0">✕</button>
+      </sc-if>`);
+  console.log('applied mobile map-flow markup patch');
+}
+const HIDDEN_CSS = '<style>.slip-map-hidden{display:none !important}</style>\n</head>';
+if (!newTemplate.includes('.slip-map-hidden{display:none')) {
+  newTemplate = newTemplate.replace('</head>', HIDDEN_CSS);
+  console.log('applied map-hidden CSS patch');
+}
+
 // Mobile airport panel: collapsed to a magnifier button until tapped; an ✕
 // closes it. Desktop keeps the always-visible panel (apPanelDisp = 'flex').
 const AP_PANEL_OPEN = '<div style="position:absolute;top:14px;right:14px;bottom:14px;z-index:1000;width:272px;display:flex;flex-direction:column;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border-radius:14px;box-shadow:0 6px 24px rgba(22,35,59,.16);overflow:hidden">';
@@ -1091,30 +1109,16 @@ if (swapped.changed) {
 // execute (the bundler swaps the document via DOM insertion), but the outer
 // page's scripts run on load and their timers survive the swap — same trick
 // as the demo toolbar. Handles SW registration + the mobile map-expand button.
-if (!out.includes('__slipOuterBoot')) {
-  const boot = '<script>window.__slipOuterBoot=1;(function(){'
-    + 'if("serviceWorker" in navigator){try{navigator.serviceWorker.register("/sw.js")}catch(e){}}'
-    + 'function ensure(){'
-    + 'if(window.innerWidth>860)return;'
-    + 'var frame=document.querySelector(\'[data-screen-label*="New request"] iframe\');'
-    + 'if(!frame)return;'
-    + 'var host=frame.parentElement;'
-    + 'if(!host||host.querySelector(".slip-map-btn"))return;'
-    + 'if(getComputedStyle(host).position==="static")host.style.position="relative";'
-    + 'var b=document.createElement("button");'
-    + 'b.className="slip-map-btn";'
-    + 'b.textContent="\\u26f6 Expand map";'
-    + 'b.addEventListener("click",function(){'
-    + 'var full=host.classList.toggle("slip-map-full");'
-    + 'b.textContent=full?"\\u2715 Close map":"\\u26f6 Expand map";'
-    + 'document.body.style.overflow=full?"hidden":"";'
-    + '});'
-    + 'host.appendChild(b);'
-    + '}'
-    + 'setInterval(ensure,800);'
-    + '})();</scr' + 'ipt>\n';
-  out = out.replace('</script>\n</body>\n</html>', '</script>\n' + boot + '</body>\n</html>');
-  console.log('applied outer-boot script (SW + mobile map expand)');
+// Upgrade/emit the outer boot script: SW registration only (the old map
+// expand button is superseded by the tap-a-location-box flow).
+const BOOT_V2 = '<script>window.__slipOuterBoot=2;(function(){if("serviceWorker" in navigator){try{navigator.serviceWorker.register("/sw.js")}catch(e){}}})();</scr' + 'ipt>\n';
+const oldBoot = /<script>window\.__slipOuterBoot=1;[^<]*<\/script>\n/;
+if (oldBoot.test(out)) {
+  out = out.replace(oldBoot, BOOT_V2);
+  console.log('upgraded outer-boot script to v2 (SW only)');
+} else if (!out.includes('__slipOuterBoot')) {
+  out = out.replace('</script>\n</body>\n</html>', '</script>\n' + BOOT_V2 + '</body>\n</html>');
+  console.log('applied outer-boot script v2 (SW only)');
 }
 
 fs.writeFileSync(bundlePath, out);
