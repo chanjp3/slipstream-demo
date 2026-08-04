@@ -589,6 +589,7 @@ async function getOperatorProfile(env, userId) {
   ).bind(userId).all()).results;
   const badge = verificationBadge(profile ? {
     cert_number: profile.cert_number,
+    cert_faa_name: profile.cert_faa_name,
     d085_name: profile.d085_name,
     fleet_n: fleet.length,
     fleet_ok: fleet.filter((f) => f.faa_status === 'verified').length,
@@ -602,12 +603,12 @@ function certLooksValid(cert) {
 
 // Verification summary used for badges on quotes and in the profile UI.
 function verificationBadge(p) {
-  // p: {cert_number, d085_name, fleet_n, fleet_ok}
+  // p: {cert_number, cert_faa_name, d085_name, fleet_n, fleet_ok}
   if (!p || !p.cert_number) return 'Unverified';
-  if (!certLooksValid(p.cert_number)) return 'Unverified';
-  if (p.fleet_n > 0 && p.fleet_n === p.fleet_ok && p.d085_name) return 'FAA-checked fleet';
-  if (p.fleet_n > 0 && p.fleet_n === p.fleet_ok) return 'FAA-checked (D085 pending)';
-  return 'Cert on file';
+  if (!p.cert_faa_name) return certLooksValid(p.cert_number) ? 'Cert unverified' : 'Unverified';
+  if (p.fleet_n > 0 && p.fleet_n === p.fleet_ok && p.d085_name) return 'FAA 135 verified';
+  if (p.fleet_n > 0 && p.fleet_n === p.fleet_ok) return 'FAA 135 verified (D085 pending)';
+  return 'FAA 135 certificate holder';
 }
 
 const SAFETY_PROGRAMS = [
@@ -625,13 +626,17 @@ async function apiSaveOperatorProfile(request, env, me) {
   const cert = String(b.certNumber || '').trim().toUpperCase().slice(0, 20);
   const base = String(b.baseIata || '').trim().toUpperCase().slice(0, 4);
   const safety = SAFETY_PROGRAMS.includes(b.safety) ? b.safety : null;
+  // Verify the certificate against the FAA's published Part 135 holders list.
+  const faa = cert
+    ? await env.DB.prepare('SELECT name FROM faa135_operators WHERE dsgn = ?').bind(cert).first()
+    : null;
   await env.DB.prepare(
-    `INSERT INTO operator_profiles (user_id, company, cert_number, base_iata, safety_program, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
+    `INSERT INTO operator_profiles (user_id, company, cert_number, base_iata, safety_program, cert_faa_name, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))
      ON CONFLICT (user_id) DO UPDATE SET company = ?2, cert_number = ?3, base_iata = ?4,
-       safety_program = ?5, updated_at = datetime('now')`
-  ).bind(me.orgId, company, cert, base, safety).run();
-  return json({ ok: true, certOk: certLooksValid(cert) });
+       safety_program = ?5, cert_faa_name = ?6, updated_at = datetime('now')`
+  ).bind(me.orgId, company, cert, base, safety, faa ? faa.name : null).run();
+  return json({ ok: true, certOk: certLooksValid(cert), faaName: faa ? faa.name : null });
 }
 
 // -------------------------------------------- aircraft photos + certificate
@@ -742,6 +747,8 @@ async function apiVerifyFleet(env, me) {
   ).bind(me.orgId).all()).results;
   if (!fleet.length) return json({ error: 'Add aircraft to your fleet first' }, 400);
 
+  const prof = await env.DB.prepare('SELECT cert_number FROM operator_profiles WHERE user_id = ?').bind(me.orgId).first();
+  const cert = prof?.cert_number || '';
   const results = [];
   for (const a of fleet) {
     const r = await faaLookup(a.tail);
@@ -749,11 +756,18 @@ async function apiVerifyFleet(env, me) {
     if (!r.ok) status = r.error ? 'pending' : 'not_found';
     else if ((r.status || '').toLowerCase() !== 'valid') status = 'not_found';
     else status = matchModel(a.model_claim, r.model);
+    // Cross-check: is this tail on the org's Part 135 certificate?
+    let onCert = null;
+    if (cert) {
+      const hit = await env.DB.prepare('SELECT 1 AS x FROM faa135_aircraft WHERE dsgn = ? AND tail = ?')
+        .bind(cert, a.tail).first();
+      onCert = hit ? 1 : 0;
+    }
     await env.DB.prepare(
       `UPDATE fleet_aircraft SET faa_mfr = ?, faa_model = ?, faa_reg_status = ?, faa_status = ?,
-       checked_at = datetime('now') WHERE id = ?`
-    ).bind(r.ok ? r.mfr : null, r.ok ? r.model : null, r.ok ? r.status : null, status, a.id).run();
-    results.push({ tail: a.tail, status, faaModel: r.ok ? r.model : null, faaMfr: r.ok ? r.mfr : null });
+       on_cert = ?, checked_at = datetime('now') WHERE id = ?`
+    ).bind(r.ok ? r.mfr : null, r.ok ? r.model : null, r.ok ? r.status : null, status, onCert, a.id).run();
+    results.push({ tail: a.tail, status, onCert, faaModel: r.ok ? r.model : null, faaMfr: r.ok ? r.mfr : null });
   }
   await env.DB.prepare(
     `INSERT INTO operator_profiles (user_id, checked_at, updated_at) VALUES (?1, datetime('now'), datetime('now'))
@@ -917,7 +931,7 @@ async function clientRequests(env, me) {
 
   const quotes = (await env.DB.prepare(
     `SELECT q.*, u.name AS operator_name,
-            p.company AS op_company, p.cert_number, p.d085_name, p.safety_program,
+            p.company AS op_company, p.cert_number, p.cert_faa_name, p.d085_name, p.safety_program,
             (SELECT plan FROM users WHERE id = COALESCE(u.org_id, u.id)) AS org_plan,
             (SELECT ROUND(AVG(rv.stars), 1) FROM reviews rv
              WHERE rv.operator_org = COALESCE(u.org_id, u.id)) AS avg_rating,
@@ -1288,7 +1302,7 @@ async function apiRemoveEmptyLeg(env, me, legId) {
 // Open, not-yet-flown legs with the operator's trust info, for the client board.
 async function emptyLegBoard(env) {
   const rows = (await env.DB.prepare(
-    `SELECT e.*, p.company, p.safety_program, p.cert_number, p.d085_name,
+    `SELECT e.*, p.company, p.safety_program, p.cert_number, p.cert_faa_name, p.d085_name,
             (SELECT ROUND(AVG(rv.stars), 1) FROM reviews rv WHERE rv.operator_org = e.operator_org) AS avg_rating,
             (SELECT COUNT(*) FROM reviews rv WHERE rv.operator_org = e.operator_org) AS review_n,
             (SELECT f.id FROM fleet_aircraft f WHERE f.operator_id = e.operator_org
