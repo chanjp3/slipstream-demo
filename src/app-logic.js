@@ -43,7 +43,8 @@ class Component extends DCLogic {
       emptyLegs: [], myLegs: [],
       legFormOpen: false, legFrom: '', legTo: '', legDate: '', legTime: '09:00',
       legAircraft: 'xls', legPrice: '', legNote: '', legMsg: '',
-      depOpen: false, depAmount: 0
+      depOpen: false, depAmount: 0,
+      apOpen: false
     };
     this.DEPOSIT_TIERS = { prop: 150, light: 150, mid: 250, smid: 250, heavy: 500, ulr: 500 };
     this.opProfile = null;
@@ -129,12 +130,21 @@ class Component extends DCLogic {
       }
     };
     window.addEventListener('message', this._onMsg);
+    this._onResize = () => this.setState({});
+    window.addEventListener('resize', this._onResize);
     this.loadData();
     this._poll = setInterval(() => this.loadData(), 7000);
   }
   componentWillUnmount() {
     window.removeEventListener('message', this._onMsg);
+    window.removeEventListener('resize', this._onResize);
     if (this._poll) clearInterval(this._poll);
+  }
+  milesBetween(lat1, lon1, lat2, lon2) {
+    const rad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+    return 3959 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
   drawRoutes() {
     const frame = this.mapRef.current;
@@ -454,8 +464,9 @@ class Component extends DCLogic {
     const readyToPost = s.legs.every(l => l.from && l.to);
 
     // ---- airport search (all airports) vs map-visible list ----
+    const isMobile = window.innerWidth <= 860;
     const q = s.apSearch.trim().toUpperCase();
-    let apMatches = null, apTotal = 0;
+    let apMatches = null, apTotal = 0, apAnchor = null, apNear = null;
     if (q && this.airports) {
       const scored = [];
       for (let i = 0; i < this.airports.length; i++) {
@@ -471,6 +482,20 @@ class Component extends DCLogic {
       scored.sort((x, y) => x[0] - y[0] || x[1].tier - y[1].tier || (x[1].name < y[1].name ? -1 : 1));
       apTotal = scored.length;
       apMatches = scored.slice(0, 30).map(x => x[1]);
+      // Mobile: the query names a LOCATION — list every airport within 100
+      // miles of the best match, nearest first, with distances.
+      if (isMobile && scored.length) {
+        apAnchor = scored[0][1];
+        const withD = [];
+        for (let i = 0; i < this.airports.length; i++) {
+          const a = this.airports[i];
+          const d = this.milesBetween(apAnchor.lat, apAnchor.lon, a.lat, a.lon);
+          if (d <= 100) withD.push([d, a]);
+        }
+        withD.sort((x, y) => x[0] - y[0]);
+        apTotal = withD.length;
+        apNear = withD.slice(0, 30);
+      }
     }
 
     // ---- client quotes ----
@@ -713,15 +738,34 @@ class Component extends DCLogic {
       onApSearch: e => this.setState({ apSearch: e.target.value }),
       apSearchActive: !!q,
       clearApSearch: () => this.setState({ apSearch: '' }),
-      apListTitle: q ? 'Search results' : 'Airports in view',
-      apListSub: q
-        ? apTotal + (apTotal === 1 ? ' match' : ' matches') + (apTotal > 30 ? ' — showing top 30' : '')
-        : s.visibleCount + ' in this area — zoom to narrow',
-      visibleList: (apMatches || s.visible).map(a => ({
-        iata: a.iata, name: a.name, loc: (a.city ? a.city + ', ' : '') + a.cc,
+      // mobile: panel collapses to a magnifier button until opened
+      apFabShow: isMobile && !s.apOpen,
+      openApPanel: () => this.setState({ apOpen: true }),
+      apCloseShow: isMobile,
+      closeApPanel: () => this.setState({ apOpen: false, apSearch: '' }),
+      apPanelDisp: (!isMobile || s.apOpen) ? 'flex' : 'none',
+      apListTitle: isMobile
+        ? (q && apAnchor ? 'Near ' + (apAnchor.city || apAnchor.name) : 'Search airports')
+        : (q ? 'Search results' : 'Airports in view'),
+      apListSub: isMobile
+        ? (q && apAnchor
+          ? apTotal + ' airport' + (apTotal === 1 ? '' : 's') + ' within 100 mi' + (apTotal > 30 ? ' — nearest 30' : '')
+          : 'Type a city or airport to see fields within 100 miles')
+        : (q
+          ? apTotal + (apTotal === 1 ? ' match' : ' matches') + (apTotal > 30 ? ' — showing top 30' : '')
+          : s.visibleCount + ' in this area — zoom to narrow'),
+      visibleList: (isMobile
+        ? (apNear ? apNear.map(([d, a]) => ({ a, d })) : [])
+        : (apMatches || s.visible).map(a => ({ a, d: null }))
+      ).map(({ a, d }) => ({
+        iata: a.iata, name: a.name,
+        loc: (a.city ? a.city + ', ' : '') + a.cc + (d !== null ? ' · ' + (d < 1 ? '<1' : Math.round(d)) + ' mi' : ''),
         chipBg: a.tier === 1 ? '#2E6BE6' : '#eef2f8', chipFg: a.tier === 1 ? '#fff' : '#16233b',
         tag: a.tier === 1 ? 'HUB' : '',
-        onPick: () => { if (q) this.setState({ apSearch: '' }); this.pickAirport(a); }
+        onPick: () => {
+          this.setState(isMobile ? { apSearch: '', apOpen: false } : (q ? { apSearch: '' } : {}));
+          this.pickAirport(a);
+        }
       })),
 
       // quotes view

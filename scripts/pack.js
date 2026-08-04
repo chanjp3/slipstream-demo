@@ -274,6 +274,25 @@ if (!newTemplate.includes('{{ apListTitle }}')) {
   console.log('applied airport-search markup patch');
 }
 
+// Mobile airport panel: collapsed to a magnifier button until tapped; an ✕
+// closes it. Desktop keeps the always-visible panel (apPanelDisp = 'flex').
+const AP_PANEL_OPEN = '<div style="position:absolute;top:14px;right:14px;bottom:14px;z-index:1000;width:272px;display:flex;flex-direction:column;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border-radius:14px;box-shadow:0 6px 24px rgba(22,35,59,.16);overflow:hidden">';
+const AP_PANEL_MOBILE = `<sc-if value="{{ apFabShow }}" hint-placeholder-val="{{ false }}">
+      <button sc-camel-on-click="{{ openApPanel }}" aria-label="Search airports" style="position:absolute;top:14px;right:14px;z-index:1001;width:46px;height:46px;border-radius:50%;background:#16233b;border:none;cursor:pointer;box-shadow:0 8px 24px rgba(10,20,40,.35);display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>
+      </button>
+      </sc-if>
+      <div style="position:absolute;top:14px;right:14px;bottom:14px;z-index:1000;width:272px;display:{{ apPanelDisp }};flex-direction:column;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border-radius:14px;box-shadow:0 6px 24px rgba(22,35,59,.16);overflow:hidden">
+        <sc-if value="{{ apCloseShow }}" hint-placeholder-val="{{ false }}">
+        <button sc-camel-on-click="{{ closeApPanel }}" aria-label="Close search" style="position:absolute;top:9px;right:9px;z-index:5;width:26px;height:26px;border-radius:8px;background:#eef2f8;border:none;cursor:pointer;font-size:12px;color:#4a5a76;padding:0">✕</button>
+        </sc-if>`;
+
+if (!newTemplate.includes('{{ apPanelDisp }}')) {
+  if (!newTemplate.includes(AP_PANEL_OPEN)) throw new Error('airport panel anchor not found — template changed?');
+  newTemplate = newTemplate.replace(AP_PANEL_OPEN, AP_PANEL_MOBILE);
+  console.log('applied mobile airport-panel markup patch');
+}
+
 // Plan section in the account menu (above CHANGE PASSWORD), with demo upgrade.
 const PW_HEADER = '<div style="font-size:10.5px;font-weight:800;letter-spacing:1px;color:#8593ab;margin-bottom:6px">CHANGE PASSWORD</div>';
 const PLAN_SECTION = `<div style="font-size:10.5px;font-weight:800;letter-spacing:1px;color:#8593ab;margin-bottom:6px">PLAN</div>
