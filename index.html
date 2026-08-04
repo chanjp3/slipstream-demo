@@ -53,7 +53,7 @@
       content: ''; position: absolute; inset: 0; pointer-events: none;
       background: radial-gradient(700px 340px at 85% 15%, rgba(255,255,255,.14), transparent 60%);
     }
-    .hero-inner { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; padding: 84px 0 96px; position: relative; z-index: 1; }
+    .hero-inner { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; padding-top: 84px; padding-bottom: 96px; position: relative; z-index: 1; }
     .kicker { display: inline-block; font-size: 11.5px; font-weight: 800; letter-spacing: 1.6px; color: #bcd2f9; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; }
     h1 { font-size: clamp(36px, 4.6vw, 56px); font-weight: 900; letter-spacing: -1.4px; line-height: 1.05; }
     .hero-sub { margin-top: 20px; font-size: clamp(16px, 1.8vw, 19px); line-height: 1.6; color: #d6e3fb; max-width: 520px; }
@@ -89,13 +89,13 @@
     .fb-2 { top: 356px; right: 210px; z-index: 3; }
     .dot { width: 8px; height: 8px; border-radius: 50%; }
     @media (max-width: 940px) {
-      .hero-inner { grid-template-columns: 1fr; padding: 64px 0 72px; }
+      .hero-inner { grid-template-columns: 1fr; padding-top: 64px; padding-bottom: 72px; }
       .mock { display: none; }
     }
 
     /* ---------- stats strip ---------- */
     .stats { border-bottom: 1px solid var(--line); background: #fff; }
-    .stats-inner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 30px 0; }
+    .stats-inner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding-top: 30px; padding-bottom: 30px; }
     .stat b { display: block; font-size: 24px; font-weight: 900; letter-spacing: -.5px; }
     .stat span { font-size: 13px; color: var(--mist); font-weight: 600; }
     @media (max-width: 720px) { .stats-inner { grid-template-columns: repeat(2, 1fr); } }
@@ -178,14 +178,14 @@
     @media (max-width: 640px) {
       .wrap { padding: 0 22px; }
       section { padding: 56px 0; }
-      .hero-inner { padding: 50px 0 58px; }
+      .hero-inner { padding-top: 50px; padding-bottom: 58px; }
       h1 { letter-spacing: -.8px; }
       .hero-sub { font-size: 15.5px; }
       .step, .op-card { padding: 22px 20px; }
       .price-card { padding: 26px 22px; }
       .legs { padding: 32px 22px; gap: 28px; }
       .final { padding: 48px 22px; }
-      .stats-inner { gap: 16px 14px; padding: 24px 0; }
+      .stats-inner { gap: 16px 14px; padding-top: 24px; padding-bottom: 24px; }
       .stat b { font-size: 20px; }
       .trust-item { gap: 13px; }
       .btn-big { padding: 14px 22px; font-size: 15px; width: 100%; text-align: center; }
