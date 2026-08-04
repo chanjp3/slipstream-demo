@@ -125,7 +125,8 @@ async function handlePage(request, env, path) {
     let session = await getSession(request, env);
 
     if (path === '/') {
-      return redirect('/app');
+      if (session) return redirect('/app');
+      return serveAsset(env, request, '/home.html');
     }
 
     if (path === '/logout') {
