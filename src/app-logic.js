@@ -44,8 +44,10 @@ class Component extends DCLogic {
       legFormOpen: false, legFrom: '', legTo: '', legDate: '', legTime: '09:00',
       legAircraft: 'xls', legPrice: '', legNote: '', legMsg: '',
       depOpen: false, depAmount: 0,
-      apOpen: false, mapOpen: false
+      apOpen: false, mapOpen: false,
+      opView: 'desk', expEdits: {}, expMsg: ''
     };
+    this.opStats = null;
     this.DEPOSIT_TIERS = { prop: 150, light: 150, mid: 250, smid: 250, heavy: 500, ulr: 500 };
     this.opProfile = null;
   }
@@ -87,6 +89,7 @@ class Component extends DCLogic {
         d.marketplace.forEach(r => { if (r.myBid) opBids[r.id] = r.myBid; });
         const keep = this.state.opSelId && d.marketplace.some(r => r.id === this.state.opSelId);
         this.opProfile = d.operatorProfile || null;
+        this.opStats = d.analytics || null;
         const patch = {
           role: 'operator', view: 'operator', userInitials: initials,
           marketplace: d.marketplace, opBids, inbox: d.inbox || [], myLegs: d.myEmptyLegs || [],
@@ -413,6 +416,19 @@ class Component extends DCLogic {
       .catch(e => this.setState({ prMsg: e.message }))
       .then(() => { this._d085ing = false; });
   }
+  saveExpenses(quoteId) {
+    const raw = this.state.expEdits[quoteId];
+    const amount = Math.round(+String(raw ?? '').replace(/[^0-9.]/g, ''));
+    if (!Number.isFinite(amount)) return;
+    this.api('/api/operator/trips/' + quoteId + '/expenses', { body: { amount } })
+      .then(() => {
+        const edits = { ...this.state.expEdits };
+        delete edits[quoteId];
+        this.setState({ expEdits: edits, expMsg: 'Expenses saved.' });
+        this.loadData();
+      })
+      .catch(e => this.setState({ expMsg: e.message }));
+  }
   createInvite() {
     this.api('/api/operator/invites', { body: {} })
       .then(d => { this.setState({ prMsg: 'Invite code created: ' + d.code + ' — share it with your teammate; they enter it when registering as an operator.' }); this.loadData(); })
@@ -649,7 +665,7 @@ class Component extends DCLogic {
       coName: realRole === 'operator' ? 'Operator Pro' : 'Traveler Plus',
       coPrice: realRole === 'operator' ? '$299' : '$79',
       coFeatures: realRole === 'operator'
-        ? [{ label: 'See new requests instantly (free tier waits 15 min)' }, { label: 'Priority placement — your quotes list first' }, { label: 'Win-rate analytics on your bidding' }, { label: 'Unlimited team seats (free: 3)' }, { label: '20 empty-leg slots (free: 3)' }]
+        ? [{ label: 'See new requests instantly (free tier waits 15 min)' }, { label: 'Priority placement — your quotes list first' }, { label: 'Unlimited team seats (free: 3)' }, { label: '20 empty-leg slots (free: 3)' }]
         : [{ label: 'Request deposits waived on every trip' }, { label: 'Empty-leg deal alerts' }, { label: 'Priority support' }, { label: 'Cancellation assistance' }],
       coComplete: () => this.completeCheckout(),
       coCancel: () => this.setState({ checkoutOpen: false }),
@@ -668,7 +684,62 @@ class Component extends DCLogic {
       showRequest: s.role === 'client' && s.view === 'request',
       showQuotes: s.role === 'client' && s.view === 'quotes',
       showDeals: s.role === 'client' && s.view === 'deals',
-      showOperator: s.role === 'operator',
+      showOperator: s.role === 'operator' && s.opView !== 'stats',
+      showOpStats: s.role === 'operator' && s.opView === 'stats',
+
+      // operator nav + analytics
+      goDesk: () => this.setState({ opView: 'desk', chatWith: null }),
+      goStats: () => this.setState({ opView: 'stats', chatWith: null, expMsg: '' }),
+      navDeskBg: s.opView !== 'stats' ? '#eef2f8' : 'transparent', navDeskFg: s.opView !== 'stats' ? '#16233b' : '#68758d',
+      navStatBg: s.opView === 'stats' ? '#eef2f8' : 'transparent', navStatFg: s.opView === 'stats' ? '#16233b' : '#68758d',
+      ...(() => {
+        const a = this.opStats;
+        if (!a) return { stTiles: [], tripRows: [], hasTrips: false, noTrips: true, memberRows: [], showMembers: false, expNote: false, expMsg: false };
+        const money = (v) => '$' + Math.round(v).toLocaleString('en-US');
+        return {
+          stTiles: [
+            { label: 'QUOTES SENT', value: String(a.sent) },
+            { label: 'TRIPS WON', value: String(a.won) },
+            { label: 'WIN RATE', value: a.winRate + '%' },
+            { label: 'REVENUE', value: money(a.revenue) },
+            { label: 'EXPENSES', value: money(a.expenses) },
+            { label: 'PROFIT', value: money(a.profit) },
+            { label: 'MARGIN', value: a.marginPct === null ? '—' : a.marginPct + '%' },
+          ],
+          expNote: a.expMissing > 0
+            ? a.expMissing + ' won trip' + (a.expMissing === 1 ? ' is' : 's are') + ' missing expenses — profit and margin cover only trips with costs entered.'
+            : false,
+          hasTrips: a.trips.length > 0,
+          noTrips: a.trips.length === 0,
+          tripRows: a.trips.map(t => {
+            const editing = s.expEdits[t.quoteId] !== undefined;
+            const expVal = editing ? s.expEdits[t.quoteId] : (t.expenses != null ? String(t.expenses) : '');
+            const profit = t.expenses != null ? t.price - t.expenses : null;
+            return {
+              route: this.routeStr(t), rid: t.rid,
+              sub: this.fmtDate(t.legs[0].date) + ' · ' + t.client + ' · quoted by ' + t.member,
+              status: (t.tripStatus || 'accepted').toUpperCase(),
+              statusBg: t.tripStatus === 'completed' ? '#e8f6ee' : '#e7eefc',
+              statusFg: t.tripStatus === 'completed' ? '#1e5e3c' : '#2E6BE6',
+              price: money(t.price),
+              expVal,
+              onExp: e => this.setState({ expEdits: { ...s.expEdits, [t.quoteId]: e.target.value } }),
+              saveExp: () => this.saveExpenses(t.quoteId),
+              profitText: profit === null ? 'Enter expenses for margin'
+                : money(profit) + ' profit · ' + (t.price ? Math.round(profit / t.price * 100) : 0) + '% margin',
+              profitColor: profit === null ? '#8593ab' : profit >= 0 ? '#1e5e3c' : '#b3261e',
+            };
+          }),
+          showMembers: !!a.members && a.members.length > 0,
+          memberRows: (a.members || []).map(m => ({
+            name: m.name,
+            sub: m.sent + ' quotes · ' + m.won + ' won (' + m.winRate + '%)',
+            revenue: money(m.revenue),
+            profit: money(m.profit) + ' profit',
+          })),
+          expMsg: s.expMsg || false,
+        };
+      })(),
 
       // empty-leg board (client)
       hasDeals: s.emptyLegs.length > 0,

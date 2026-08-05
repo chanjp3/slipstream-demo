@@ -242,6 +242,8 @@ async function handleApi(request, env, path) {
       return await apiRevokeInvite(env, me, m[1]);
     if ((m = path.match(/^\/api\/operator\/members\/(\d+)\/remove$/)) && method === 'POST')
       return await apiRemoveMember(env, me, +m[1]);
+    if ((m = path.match(/^\/api\/operator\/trips\/(\d+)\/expenses$/)) && method === 'POST')
+      return await apiSetTripExpenses(request, env, me, +m[1]);
     if (path === '/api/bootstrap' && method === 'GET') return await apiBootstrap(env, me);
     if (path === '/api/requests' && method === 'POST') return await apiCreateRequest(request, env, me);
 
@@ -495,6 +497,90 @@ async function apiUpdatePrefs(request, env, me) {
   await env.DB.prepare('UPDATE users SET prefs = ? WHERE id = ?')
     .bind(JSON.stringify(prefs), me.id).run();
   return json({ ok: true, prefs });
+}
+
+// ---------------------------------------------------------------- analytics
+
+// Org-wide sales analytics: every quote the team has sent, joined to its
+// request, with expenses on won trips for profit margins.
+async function operatorAnalytics(env, me) {
+  const rows = (await env.DB.prepare(
+    `SELECT q.id AS quote_id, q.price, q.expenses, q.operator_id, u.name AS member,
+            r.id AS rid, r.type, r.legs, r.accepted_quote_id, r.trip_status,
+            cu.name AS client
+     FROM quotes q
+     JOIN requests r ON r.id = q.request_id
+     JOIN users u ON u.id = q.operator_id
+     JOIN users cu ON cu.id = r.user_id
+     WHERE q.operator_id IN (SELECT id FROM users WHERE org_id = ?)
+     ORDER BY q.created_at DESC`
+  ).bind(me.orgId).all()).results;
+
+  const isWon = (r) => r.accepted_quote_id === r.quote_id && r.trip_status !== 'cancelled';
+  const won = rows.filter(isWon);
+  const revenue = won.reduce((s, r) => s + r.price, 0);
+  const withExp = won.filter((r) => r.expenses != null);
+  const expTotal = withExp.reduce((s, r) => s + r.expenses, 0);
+  const revWithExp = withExp.reduce((s, r) => s + r.price, 0);
+
+  const out = {
+    sent: rows.length,
+    won: won.length,
+    winRate: rows.length ? Math.round((won.length / rows.length) * 100) : 0,
+    revenue,
+    expenses: expTotal,
+    profit: revWithExp - expTotal,
+    marginPct: revWithExp ? Math.round(((revWithExp - expTotal) / revWithExp) * 100) : null,
+    expMissing: won.length - withExp.length,
+    trips: won.map((r) => ({
+      quoteId: r.quote_id,
+      rid: r.rid,
+      type: r.type,
+      legs: JSON.parse(r.legs),
+      client: r.client,
+      member: r.member,
+      price: r.price,
+      expenses: r.expenses,
+      tripStatus: r.trip_status,
+    })),
+  };
+  if (me.orgRole === 'admin') {
+    const byMember = new Map();
+    for (const r of rows) {
+      const m = byMember.get(r.operator_id) || { name: r.member, sent: 0, won: 0, revenue: 0, expenses: 0, revWithExp: 0 };
+      m.sent++;
+      if (isWon(r)) {
+        m.won++;
+        m.revenue += r.price;
+        if (r.expenses != null) { m.expenses += r.expenses; m.revWithExp += r.price; }
+      }
+      byMember.set(r.operator_id, m);
+    }
+    out.members = [...byMember.values()].map((m) => ({
+      name: m.name, sent: m.sent, won: m.won,
+      winRate: m.sent ? Math.round((m.won / m.sent) * 100) : 0,
+      revenue: m.revenue,
+      profit: m.revWithExp - m.expenses,
+    })).sort((a, b) => b.revenue - a.revenue);
+  }
+  return out;
+}
+
+// Any team member can record a won trip's costs.
+async function apiSetTripExpenses(request, env, me, quoteId) {
+  if (me.role !== 'operator') return json({ error: 'Operators only' }, 403);
+  const b = await request.json().catch(() => null);
+  const amount = b ? Math.round(+b.amount) : NaN;
+  if (!Number.isFinite(amount) || amount < 0 || amount > 5_000_000) return json({ error: 'Enter a valid amount' }, 400);
+  const q = await env.DB.prepare(
+    `SELECT q.id FROM quotes q
+     JOIN requests r ON r.id = q.request_id
+     JOIN users u ON u.id = q.operator_id
+     WHERE q.id = ?1 AND COALESCE(u.org_id, u.id) = ?2 AND r.accepted_quote_id = q.id`
+  ).bind(quoteId, me.orgId).first();
+  if (!q) return json({ error: 'Trip not found' }, 404);
+  await env.DB.prepare('UPDATE quotes SET expenses = ? WHERE id = ?').bind(amount, quoteId).run();
+  return json({ ok: true, expenses: amount });
 }
 
 // ---------------------------------------------------- operator profile / FAA
@@ -960,6 +1046,7 @@ async function apiBootstrap(env, me) {
     inbox: await operatorInbox(env, me),
     operatorProfile: profile,
     myEmptyLegs: await myEmptyLegs(env, me),
+    analytics: await operatorAnalytics(env, me),
   });
 }
 

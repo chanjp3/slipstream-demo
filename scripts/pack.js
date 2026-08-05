@@ -877,6 +877,96 @@ if (!newTemplate.includes('{{ opAnonNote }}')) {
   console.log('applied operator-anonymity-notice patch to ' + copies + ' drawer cop' + (copies === 1 ? 'y' : 'ies'));
 }
 
+// ---- Operator analytics ----
+
+// Nav: Bid desk / Analytics tabs replace the static operator label.
+const OP_NAV_OLD = `<span style="padding:8px 14px;font-size:13.5px;font-weight:600;color:#16233b">Bid desk</span>
+        <span style="padding:8px 0;font-size:13px;color:#8593ab">{{ openRfqCount }} open requests · sealed bidding</span>`;
+if (!newTemplate.includes('{{ goStats }}')) {
+  if (!newTemplate.includes(OP_NAV_OLD)) throw new Error('operator nav anchor not found — template changed?');
+  newTemplate = newTemplate.replace(OP_NAV_OLD,
+    `<button sc-camel-on-click="{{ goDesk }}" style="display:flex;align-items:center;gap:7px;border:none;cursor:pointer;padding:8px 14px;border-radius:8px;font-size:13.5px;font-weight:600;background:{{ navDeskBg }};color:{{ navDeskFg }}">Bid desk
+          <span style="background:#2E6BE6;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px">{{ openRfqCount }}</span>
+        </button>
+        <button sc-camel-on-click="{{ goStats }}" style="border:none;cursor:pointer;padding:8px 14px;border-radius:8px;font-size:13.5px;font-weight:600;background:{{ navStatBg }};color:{{ navStatFg }}">Analytics</button>`);
+  console.log('applied operator-nav tabs markup patch');
+}
+
+// Analytics screen: stat tiles, won-trip expense entry with margins, and an
+// admin-only member breakdown.
+const CHECKOUT_IF = '<sc-if value="{{ checkoutOpen }}"';
+const STATS_SCREEN = `<sc-if value="{{ showOpStats }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Operator — Analytics" style="flex:1;overflow-y:auto;padding:24px 28px 60px;min-height:0">
+    <div style="max-width:960px;margin:0 auto">
+      <h1 style="margin:0;font-size:22px;font-weight:800;color:#16233b">Sales analytics</h1>
+      <div style="color:#68758d;font-size:13.5px;margin-top:4px">Your team's quoting, wins, revenue, and margins — cancelled trips excluded.</div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:20px">
+        <sc-for list="{{ stTiles }}" as="t" hint-placeholder-count="7">
+          <div style="background:#fff;border:1.5px solid #e3e9f2;border-radius:14px;padding:14px 16px">
+            <div style="font-size:9.5px;font-weight:800;letter-spacing:1px;color:#8593ab">{{ t.label }}</div>
+            <div style="font-size:20px;font-weight:800;color:#16233b;margin-top:4px">{{ t.value }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ expNote }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:10px;padding:9px 13px;background:#fdf6e3;border-radius:10px;font-size:12px;color:#8a6d1f;font-weight:600">{{ expNote }}</div>
+      </sc-if>
+
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:#8593ab;margin:26px 0 10px">WON TRIPS · ENTER COSTS FOR MARGINS</div>
+      <sc-if value="{{ hasTrips }}" hint-placeholder-val="{{ false }}">
+      <sc-for list="{{ tripRows }}" as="t" hint-placeholder-count="2">
+        <div style="background:#fff;border:1.5px solid #e3e9f2;border-radius:14px;padding:14px 16px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="min-width:0">
+              <span style="font-family:ui-monospace,Menlo,monospace;font-weight:800;font-size:15px;color:#16233b">{{ t.route }}</span>
+              <span style="font-size:12px;color:#8593ab;margin-left:8px">{{ t.rid }}</span>
+              <span style="font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 8px;border-radius:999px;background:{{ t.statusBg }};color:{{ t.statusFg }};margin-left:8px">{{ t.status }}</span>
+              <div style="font-size:12px;color:#68758d;margin-top:3px">{{ t.sub }}</div>
+            </div>
+            <div style="font-size:18px;font-weight:800;color:#16233b">{{ t.price }}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#8593ab">EXPENSES $</span>
+            <input value="{{ t.expVal }}" sc-camel-on-change="{{ t.onExp }}" placeholder="e.g. 9,800" style="width:120px;border:1.5px solid #dde5f0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:700">
+            <button sc-camel-on-click="{{ t.saveExp }}" style="border:none;cursor:pointer;background:#16233b;color:#fff;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700">Save</button>
+            <span style="font-size:12.5px;font-weight:700;color:{{ t.profitColor }}">{{ t.profitText }}</span>
+          </div>
+        </div>
+      </sc-for>
+      </sc-if>
+      <sc-if value="{{ noTrips }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1.5px dashed #c6d2e6;border-radius:14px;padding:28px;text-align:center;color:#8593ab;font-size:13px">No won trips yet — win a request and it lands here.</div>
+      </sc-if>
+      <sc-if value="{{ expMsg }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:4px;font-size:12px;color:#2E6BE6;font-weight:600">{{ expMsg }}</div>
+      </sc-if>
+
+      <sc-if value="{{ showMembers }}" hint-placeholder-val="{{ false }}">
+      <div style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:#8593ab;margin:26px 0 10px">TEAM PERFORMANCE</div>
+      <sc-for list="{{ memberRows }}" as="m" hint-placeholder-count="2">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border:1.5px solid #e3e9f2;border-radius:12px;padding:12px 16px;margin-bottom:8px;flex-wrap:wrap">
+          <div style="min-width:0">
+            <div style="font-size:13.5px;font-weight:800;color:#16233b">{{ m.name }}</div>
+            <div style="font-size:12px;color:#68758d;margin-top:2px">{{ m.sub }}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:15px;font-weight:800;color:#16233b">{{ m.revenue }}</div>
+            <div style="font-size:12px;color:#1e5e3c;font-weight:700">{{ m.profit }}</div>
+          </div>
+        </div>
+      </sc-for>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>
+  ` + CHECKOUT_IF;
+if (!newTemplate.includes('{{ showOpStats }}')) {
+  if (!newTemplate.includes(CHECKOUT_IF)) throw new Error('checkout modal anchor not found — template changed?');
+  newTemplate = newTemplate.replace(CHECKOUT_IF, STATS_SCREEN);
+  console.log('applied operator-analytics screen markup patch');
+}
+
 // Demo checkout modal (global overlay, both roles).
 const CHECKOUT_MODAL = `<sc-if value="{{ checkoutOpen }}" hint-placeholder-val="{{ false }}">
 <div style="position:fixed;inset:0;background:rgba(10,20,40,.55);display:flex;align-items:center;justify-content:center;z-index:3000">
