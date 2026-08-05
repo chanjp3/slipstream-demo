@@ -146,6 +146,10 @@ async function handlePage(request, env, path) {
       return serveAsset(env, request, path + '.html');
     }
 
+    if (path === '/forgot' || path === '/reset') {
+      return serveAsset(env, request, path + '.html');
+    }
+
     // Never serve the app bundle directly — it must go through the auth gate.
     if (path === '/app.html') {
       return redirect('/app');
@@ -192,6 +196,8 @@ async function handleApi(request, env, path) {
     if (path === '/api/login' && method === 'POST') return await apiLogin(request, env);
     if (path === '/api/logout' && method === 'POST') return await apiLogout(request, env);
     if (path === '/api/demo/switch' && method === 'POST') return await apiDemoSwitch(request, env);
+    if (path === '/api/forgot' && method === 'POST') return await apiForgotPassword(request, env);
+    if (path === '/api/reset' && method === 'POST') return await apiResetPassword(request, env);
 
     // Everything below requires a session. The user row is consulted on every
     // request: org membership changes and session-epoch bumps (password
@@ -311,6 +317,9 @@ async function apiRegister(request, env) {
         .bind(invite.org_id, 'member', userId).run();
       await env.DB.prepare("UPDATE org_invites SET used_by = ?, used_at = datetime('now') WHERE code = ?")
         .bind(userId, invite.code).run();
+      await notifyUser(env, invite.org_id, name + ' joined your Slipstream team',
+        [name + ' registered with your invite code and can now quote and message under your company profile.'],
+        new URL(request.url).origin + '/app', 'View your team');
     } else {
       await env.DB.prepare('UPDATE users SET org_id = ?, org_role = ? WHERE id = ?')
         .bind(userId, 'admin', userId).run();
@@ -347,6 +356,53 @@ async function apiLogout(request, env) {
     200,
     'slipstream_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
   );
+}
+
+// Forgot password: emailed single-use token (30 min TTL). The response never
+// reveals whether the email exists. In demo mode (no email provider) the
+// reset link is returned directly so the flow stays testable.
+async function apiForgotPassword(request, env) {
+  const b = await request.json().catch(() => null);
+  const email = b ? String(b.email || '').trim().toLowerCase() : '';
+  if (!email) return json({ error: 'Enter your email' }, 400);
+  const limited = await rateLimit(request, env, 'forgot', email);
+  if (limited) return limited;
+
+  const user = await env.DB.prepare('SELECT id, hash FROM users WHERE email = ?').bind(email).first();
+  let demoLink = null;
+  if (user && user.hash !== 'x') {
+    const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
+    await env.SLIPSTREAM_KV.put('pwreset:' + token, JSON.stringify({ id: user.id }), { expirationTtl: 1800 });
+    const link = new URL(request.url).origin + '/reset?token=' + token;
+    await sendEmail(env, email, 'Reset your Slipstream password',
+      emailHtml('Reset your password',
+        ['Someone (hopefully you) asked to reset the password for this account.',
+         'The link below works once and expires in 30 minutes. If you didn\u2019t ask, ignore this email \u2014 nothing changes.'],
+        'Choose a new password', link));
+    if (!env.RESEND_API_KEY) demoLink = link;
+  }
+  const res = { ok: true };
+  if (demoLink) res.demoLink = demoLink;
+  return json(res);
+}
+
+async function apiResetPassword(request, env) {
+  const b = await request.json().catch(() => null);
+  if (!b) return json({ error: 'Invalid request body' }, 400);
+  const token = String(b.token || '');
+  const password = String(b.password || '');
+  if (password.length < 8) return json({ error: 'Password must be at least 8 characters' }, 400);
+  if (!/^[0-9a-f]{64}$/.test(token)) return json({ error: 'This reset link is invalid or expired' }, 400);
+  const raw = await env.SLIPSTREAM_KV.get('pwreset:' + token);
+  if (!raw) return json({ error: 'This reset link is invalid or expired' }, 400);
+  const { id } = JSON.parse(raw);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await hashPassword(password, salt);
+  // New password + bumped epoch: every existing session is signed out.
+  await env.DB.prepare('UPDATE users SET salt = ?, hash = ?, session_epoch = session_epoch + 1 WHERE id = ?')
+    .bind(toHex(salt), toHex(hash), id).run();
+  await env.SLIPSTREAM_KV.delete('pwreset:' + token);
+  return json({ ok: true });
 }
 
 async function createSession(env, user) {
@@ -825,6 +881,52 @@ function depositFor(cats) {
   return amounts.length ? Math.max(...amounts) : 250;
 }
 
+// ------------------------------------------------------------------- email
+
+// Sends via Resend when RESEND_API_KEY is configured; otherwise records the
+// email in email_outbox (demo mode) so triggers are verifiable end to end.
+async function sendEmail(env, to, subject, html) {
+  try {
+    if (env.RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { authorization: 'Bearer ' + env.RESEND_API_KEY, 'content-type': 'application/json' },
+        body: JSON.stringify({ from: env.EMAIL_FROM || 'Slipstream <onboarding@resend.dev>', to: [to], subject, html }),
+      });
+    } else {
+      await env.DB.prepare('INSERT INTO email_outbox (to_email, subject, html) VALUES (?, ?, ?)')
+        .bind(to, subject, html).run();
+    }
+  } catch (e) { console.error('sendEmail failed:', e.message); }
+}
+
+function emailHtml(title, lines, ctaText, ctaUrl) {
+  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:26px">'
+    + '<div style="font-size:18px;font-weight:800;color:#2E6BE6;margin-bottom:16px">Slipstream</div>'
+    + '<div style="font-size:16px;font-weight:700;color:#16233b;margin-bottom:10px">' + title + '</div>'
+    + lines.map((l) => '<p style="font-size:14px;color:#4a5a76;line-height:1.6;margin:0 0 10px">' + l + '</p>').join('')
+    + (ctaUrl ? '<a href="' + ctaUrl + '" style="display:inline-block;margin-top:8px;background:#2E6BE6;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 20px;border-radius:9px">' + (ctaText || 'Open Slipstream') + '</a>' : '')
+    + '<p style="font-size:12px;color:#8593ab;margin-top:24px">You received this because of activity on your Slipstream account.</p>'
+    + '</div>';
+}
+
+async function notifyUser(env, userId, subject, lines, ctaUrl, ctaText) {
+  const u = await env.DB.prepare('SELECT email, name FROM users WHERE id = ?').bind(userId).first();
+  if (!u || u.hash === 'x') { /* unloginable demo rows have no inbox */ }
+  if (!u) return;
+  await sendEmail(env, u.email, subject, emailHtml(subject, lines, ctaText, ctaUrl));
+}
+
+// At most one email per key per hour (e.g. chat pings per conversation).
+async function shouldNotify(env, key) {
+  const k = key + ':' + Math.floor(Date.now() / 3600000);
+  const existing = await env.DB.prepare('SELECT k FROM email_notif WHERE k = ?').bind(k).first();
+  if (existing) return false;
+  await env.DB.prepare("INSERT OR IGNORE INTO email_notif (k, at) VALUES (?, datetime('now'))").bind(k).run();
+  await env.DB.prepare("DELETE FROM email_notif WHERE at < datetime('now', '-3 hours')").run();
+  return true;
+}
+
 async function apiBootstrap(env, me) {
   const row = await env.DB.prepare('SELECT name, prefs, plan FROM users WHERE id = ?').bind(me.id).first();
   const meOut = {
@@ -1169,6 +1271,10 @@ async function apiSubmitQuote(request, env, me, requestId) {
   } catch (e) {
     return json({ error: 'You already submitted a quote for this request' }, 409);
   }
+  await notifyUser(env, req.user_id, 'New sealed quote on ' + requestId,
+    ['A verified operator submitted a sealed quote of $' + price.toLocaleString('en-US') + ' on your request ' + requestId + '.',
+     'Compare it side by side with your other quotes, message the operator, and accept when ready.'],
+    new URL(request.url).origin + '/app', 'View your quotes');
   return json({ ok: true, price });
 }
 
@@ -1192,6 +1298,20 @@ async function apiAcceptQuote(request, env, me, requestId) {
        deposit_status = CASE WHEN deposit_status = 'held' THEN 'kept' ELSE deposit_status END
      WHERE id = ?`
   ).bind(quoteId, requestId).run();
+  {
+    const winner = await env.DB.prepare(
+      'SELECT q.operator_id, COALESCE(u.org_id, u.id) AS org FROM quotes q JOIN users u ON u.id = q.operator_id WHERE q.id = ?'
+    ).bind(quoteId).first();
+    if (winner) {
+      const origin = new URL(request.url).origin;
+      const lines = ['Your sealed quote on ' + requestId + ' was accepted \u2014 your identity is now visible to the client.',
+        'Open the conversation to coordinate the contract and confirm the trip.'];
+      await notifyUser(env, winner.operator_id, 'Your quote was accepted \u2014 ' + requestId, lines, origin + '/app', 'Open the conversation');
+      if (winner.org !== winner.operator_id) {
+        await notifyUser(env, winner.org, 'Your team won ' + requestId, lines, origin + '/app', 'Open the conversation');
+      }
+    }
+  }
   return json({ ok: true, acceptedQuoteId: quoteId });
 }
 
@@ -1242,6 +1362,21 @@ async function apiTripAction(request, env, me, requestId) {
     next = 'cancelled';
   }
   await env.DB.prepare('UPDATE requests SET trip_status = ? WHERE id = ?').bind(next, requestId).run();
+  {
+    const origin = new URL(request.url).origin;
+    const label = next === 'confirmed' ? 'Your trip is confirmed'
+      : next === 'completed' ? 'Your trip is complete'
+      : 'Trip cancelled';
+    const line = next === 'confirmed' ? 'The operator confirmed ' + requestId + ' \u2014 your aircraft is locked in.'
+      : next === 'completed' ? requestId + ' is marked complete. How was it? Leave a review to help other travelers.'
+      : requestId + ' was cancelled.';
+    if (isWinningOp) {
+      await notifyUser(env, req.user_id, label + ' \u2014 ' + requestId, [line], origin + '/app', 'Open Slipstream');
+    } else if (q) {
+      const bidder = await env.DB.prepare('SELECT operator_id FROM quotes q WHERE q.id = ?').bind(req.accepted_quote_id).first();
+      if (bidder) await notifyUser(env, bidder.operator_id, 'Trip cancelled by the client \u2014 ' + requestId, [line], origin + '/app', 'Open Slipstream');
+    }
+  }
   return json({ ok: true, tripStatus: next });
 }
 
@@ -1539,6 +1674,14 @@ async function apiSendMessage(request, env, me, quoteId) {
   if (!text) return json({ error: 'Empty message' }, 400);
   await env.DB.prepare('INSERT INTO messages (quote_id, sender_id, text) VALUES (?, ?, ?)')
     .bind(quoteId, me.id, text).run();
+  {
+    const recipient = me.id === q.client_id ? q.operator_id : q.client_id;
+    if (await shouldNotify(env, 'msg:' + quoteId + ':' + recipient)) {
+      await notifyUser(env, recipient, 'New message on Slipstream',
+        ['You have a new message in one of your Slipstream conversations.'],
+        new URL(request.url).origin + '/app', 'Read & reply');
+    }
+  }
   return json({ ok: true });
 }
 
