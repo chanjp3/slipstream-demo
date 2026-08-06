@@ -960,11 +960,29 @@ const STATS_SCREEN = `<sc-if value="{{ showOpStats }}" hint-placeholder-val="{{ 
     </div>
   </div>
   </sc-if>
-  ` + CHECKOUT_IF;
+`;
+// The screen must live INSIDE the app shell (the height:100vh overflow:hidden
+// flex column) or it lays out below the viewport. The shell's last child is
+// the operator bid-desk screen; this anchor is its close + the shell's close.
+const SHELL_CLOSE = '    </div>\n  </div>\n  </sc-if>\n</div>\n';
 if (!newTemplate.includes('{{ showOpStats }}')) {
-  if (!newTemplate.includes(CHECKOUT_IF)) throw new Error('checkout modal anchor not found — template changed?');
-  newTemplate = newTemplate.replace(CHECKOUT_IF, STATS_SCREEN);
+  if (!newTemplate.includes(SHELL_CLOSE)) throw new Error('app-shell close anchor not found — template changed?');
+  newTemplate = newTemplate.replace(SHELL_CLOSE, () =>
+    '    </div>\n  </div>\n  </sc-if>\n' + STATS_SCREEN + '</div>\n');
   console.log('applied operator-analytics screen markup patch');
+} else if (newTemplate.includes('</div>\n<sc-if value="{{ showOpStats }}"')) {
+  // v2: the first pack inserted the screen after the shell's closing </div>,
+  // so it rendered below the 100vh viewport. Cut it out and move it inside.
+  const stStart = newTemplate.indexOf('<sc-if value="{{ showOpStats }}"');
+  const stEndMark = '  </sc-if>\n  ' + CHECKOUT_IF;
+  const stEnd = newTemplate.indexOf(stEndMark, stStart);
+  if (stEnd === -1) throw new Error('analytics screen end not found — template changed?');
+  const stBlock = newTemplate.slice(stStart, stEnd + '  </sc-if>\n'.length);
+  newTemplate = newTemplate.slice(0, stStart) + newTemplate.slice(stEnd + '  </sc-if>\n'.length);
+  if (!newTemplate.includes(SHELL_CLOSE)) throw new Error('app-shell close anchor not found — template changed?');
+  newTemplate = newTemplate.replace(SHELL_CLOSE, () =>
+    '    </div>\n  </div>\n  </sc-if>\n' + stBlock + '</div>\n');
+  console.log('moved operator-analytics screen inside the app shell');
 }
 
 // Demo checkout modal (global overlay, both roles).
