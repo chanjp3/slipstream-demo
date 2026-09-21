@@ -6,20 +6,21 @@
   <title>Reset password — Chartavia</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Albert Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: #2E6BE6; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
     .card { background: #fff; border-radius: 20px; padding: 40px; width: 100%; max-width: 420px; box-shadow: 0 24px 60px rgba(10,30,80,.35); }
-    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-    .logo-mark { width: 34px; height: 34px; border-radius: 9px; background: #2E6BE6; display: flex; align-items: center; justify-content: center; }
-    .logo-mark svg { width: 20px; height: 20px; }
-    .logo-name { font-size: 20px; font-weight: 800; color: #16233b; letter-spacing: -.3px; }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .logo-mark { display: flex; }
+    .logo-mark svg { width: 36px; height: 36px; display: block; }
+    .logo-word { display: flex; color: #16233b; }
+    .logo-word svg { display: block; }
     .tagline { color: #68758d; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
     label { display: block; font-size: 13px; font-weight: 600; color: #4a5a76; margin: 16px 0 6px; }
     input { width: 100%; padding: 12px 14px; font-size: 15px; font-family: inherit; border: 1px solid #dde5f0; border-radius: 10px; color: #16233b; outline: none; }
     input:focus { border-color: #2E6BE6; }
-    button { width: 100%; margin-top: 24px; padding: 13px; font-size: 15px; font-weight: 700; font-family: inherit; color: #fff; background: #2E6BE6; border: none; border-radius: 10px; cursor: pointer; }
+    button { width: 100%; margin-top: 24px; padding: 13px; font-size: 15px; font-weight: 700; font-family: 'Quicksand', 'Albert Sans', sans-serif; letter-spacing: .2px; color: #fff; background: #2E6BE6; border: none; border-radius: 999px; cursor: pointer; }
     button:hover { background: #2558c4; }
     button:disabled { background: #a9b4c8; cursor: default; }
     .msg { display: none; margin-top: 16px; padding: 12px 14px; font-size: 13px; border-radius: 8px; line-height: 1.5; word-break: break-all; }
@@ -28,6 +29,8 @@
     .alt { margin-top: 20px; text-align: center; font-size: 14px; color: #68758d; }
     .alt a { color: #2E6BE6; font-weight: 600; text-decoration: none; }
   </style>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#2E6BE6">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -35,8 +38,8 @@
 <body>
   <div class="card">
     <div class="logo">
-      <div class="logo-mark"><svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg"><rect x="38" y="42" width="46" height="6" rx="3" fill="#ffffff" transform="rotate(-20 60 45)"></rect><rect x="32" y="52" width="26" height="6" rx="3" fill="#a8c4f4" transform="rotate(-20 45 55)"></rect></svg></div>
-      <div class="logo-name">Chartavia</div>
+      <div class="logo-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="36" height="36" role="img" aria-label="Chartavia"><rect width="512" height="512" rx="116" fill="#2E6BE6"/><g transform="rotate(45 256 256) translate(256 256) scale(1.04) translate(-256 -262)"><g><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><g transform="translate(512 0) scale(-1 1)"><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><path d="M256,40 C276,70 282,118 282,166 L282,398 C282,432 268,456 256,470 C244,456 230,432 230,398 L230,166 C230,118 236,70 256,40 Z" fill="#fff"/></g></svg></div>
+      <div class="logo-word"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 823.94 100" width="131.83" height="16" role="img" aria-label="Chartavia"><g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 0)"><path d="M82.94,22.36 A43,43 0 1 0 82.94,77.64"/></g><g transform="translate(113.94 0)"><path d="M7,7 V93"/><path d="M73,7 V93"/><path d="M7,50 H73"/></g><g transform="translate(213.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(321.94 0)"><path d="M7,93 V7 H42 A24.5,24.5 0 0 1 42,56 H7"/><path d="M36,56 L71,93"/></g><g transform="translate(417.94 0)"><path d="M7,7 H75"/><path d="M41,7 V93"/></g><g transform="translate(505.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(597.94 0)"><path d="M7,7 L45,93 L83,7"/></g><g transform="translate(703.94 0)"><path d="M7,7 V93"/></g><g transform="translate(733.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g></g></svg></div>
     </div>
     <div class="tagline">Enter your account email and we'll send a one-time link to choose a new password.</div>
     <form id="form">

@@ -989,8 +989,13 @@ async function sendEmail(env, to, subject, html) {
 }
 
 function emailHtml(title, lines, ctaText, ctaUrl) {
+  // Email clients don't render SVG, so the header uses the hosted PNG icon.
+  let icon = '';
+  try {
+    if (ctaUrl) icon = '<img src="' + new URL(ctaUrl).origin + '/icon-192.png" width="30" height="30" alt="" style="border-radius:7px;vertical-align:middle;margin-right:10px">';
+  } catch (e) { /* relative link: no icon */ }
   return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:26px">'
-    + '<div style="font-size:18px;font-weight:800;color:#2E6BE6;margin-bottom:16px">Chartavia</div>'
+    + '<div style="margin-bottom:18px">' + icon + '<span style="font-size:16px;font-weight:700;letter-spacing:3px;color:#16233b;vertical-align:middle">CHARTAVIA</span></div>'
     + '<div style="font-size:16px;font-weight:700;color:#16233b;margin-bottom:10px">' + title + '</div>'
     + lines.map((l) => '<p style="font-size:14px;color:#4a5a76;line-height:1.6;margin:0 0 10px">' + l + '</p>').join('')
     + (ctaUrl ? '<a href="' + ctaUrl + '" style="display:inline-block;margin-top:8px;background:#2E6BE6;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 20px;border-radius:9px">' + (ctaText || 'Open Chartavia') + '</a>' : '')

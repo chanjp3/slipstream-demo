@@ -74,6 +74,24 @@ if (!newTemplate.includes('<title>Chartavia')) {
   console.log('applied Chartavia title + app-name markup patch');
 }
 
+// Logo: the jet tile and wordmark from scripts/logo.js replace the design's
+// two-streak tile and live-text name.
+const logo = require('./logo');
+const OLD_TILE = /<div style="width:30px;height:30px;border-radius:8px;background:#2E6BE6;position:relative;overflow:hidden">(?:\s*<div style="position:absolute;[^"]*"><\/div>){2}\s*<\/div>/;
+const OLD_NAME = '<div style="font-weight:800;font-size:16px;letter-spacing:-.2px">Chartavia</div>';
+if (!newTemplate.includes('aria-label="Chartavia"')) {
+  if (!OLD_TILE.test(newTemplate) || !newTemplate.includes(OLD_NAME)) throw new Error('header logo anchors not found — template changed?');
+  newTemplate = newTemplate
+    .replace(OLD_TILE, () => logo.tileSvg(30, ' style="display:block;flex:none"'))
+    .replace(OLD_NAME, () => '<div style="color:#16233b;margin-bottom:4px">' + logo.wordmarkSvg(14, 'currentColor', ' style="display:block"') + '</div>');
+  console.log('applied Chartavia logo markup patch');
+}
+const FAVICON_LINKS = '<link rel="icon" type="image/svg+xml" href="/favicon.svg">\n<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">\n';
+if (!newTemplate.includes('rel="icon"')) {
+  newTemplate = newTemplate.replace(MANIFEST_LINK, () => FAVICON_LINKS + MANIFEST_LINK);
+  console.log('applied favicon markup patch');
+}
+
 // Mobile map expand: on phone widths an "Expand map" button floats over the
 // request-screen map; tapping it makes the map (with its airport search
 // panel) fullscreen. Injected as a survives-document-replacement script.
