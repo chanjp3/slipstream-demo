@@ -41,7 +41,7 @@ class Component extends DCLogic {
       apOpen: false, mapOpen: false,
       opView: 'desk', expEdits: {}, expMsg: '',
       conOpen: false, conTopic: 'trip', conReqId: null, conMsg: '', conPhone: '', conBusy: false, conDone: '', conErr: '',
-      staffOpen: false
+      staffOpen: false, staffTab: 'messages', opNotes: {}, staffMsg: ''
     };
     this.opStats = null;
     this.DEPOSIT_TIERS = { prop: 150, light: 150, mid: 250, smid: 250, heavy: 500, ulr: 500 };
@@ -127,7 +127,7 @@ class Component extends DCLogic {
   // The two checks behind the quoting gate, with what is still missing.
   gateSteps() {
     const p = this.opProfile;
-    const c = (p && p.clearance) || { ok: false, certOk: false, cleared: [], reason: 'cert_missing' };
+    const c = (p && p.clearance) || { ok: false, certOk: false, cleared: [], autoOk: false, review: 'pending', reason: 'cert_missing' };
     const prof = (p && p.profile) || {};
     const fleet = p ? p.fleet : [];
     const certHint = c.certOk ? 'Matched to ' + prof.cert_faa_name + ' (' + prof.cert_number + ')'
@@ -138,14 +138,23 @@ class Component extends DCLogic {
       : !fleet.length ? 'Add the aircraft you operate, then run the FAA check.'
       : fleet.every(a => !a.faa_status || a.faa_status === 'pending') ? 'Run the FAA check on your fleet.'
       : matched.length && !c.certOk ? 'Your aircraft match the registry. They are checked against your certificate once it is verified.'
-      : matched.length ? 'Your aircraft match the registry but are not on certificate ' + prof.cert_number + ' in the FAA list. If your D085 changed recently, message the partner desk.'
-      : 'No aircraft has passed yet. See the note beside each tail number.';
-    const look = (done, n) => done
-      ? { mark: '✓', bg: '#e8f6ee', fg: '#1e5e3c', bd: '#9fd8b6' }
+      : matched.length ? 'Your aircraft match the registry but are not on certificate ' + prof.cert_number + ' in the FAA list. If your D085 changed recently, message the partner desk: we can clear an aircraft against your documents.'
+      : 'No aircraft has passed yet. See the note beside each tail number, or message the partner desk.';
+    const missingDocs = [!prof.cert_doc_name && 'air carrier certificate', !prof.d085_name && 'D085'].filter(Boolean);
+    const reviewHint = c.review === 'approved' ? 'Approved for certificate ' + prof.cert_number + '.'
+      : c.review === 'declined' ? 'We could not yet confirm that this account belongs to the certificate holder. Message the partner desk and we will work through it.'
+      : c.autoOk ? 'In review. A member of our team confirms this account belongs to the certificate holder, and you get an email when it is done.'
+        + (missingDocs.length ? ' Uploading your ' + missingDocs.join(' and ') + ' speeds this up.' : '')
+      : 'Starts on its own once the two checks above pass.';
+    const look = (state, n) => state === 'done' ? { mark: '✓', bg: '#e8f6ee', fg: '#1e5e3c', bd: '#9fd8b6' }
+      : state === 'wait' ? { mark: '…', bg: '#fbf8f0', fg: '#8a6b2e', bd: '#e6dcc3' }
+      : state === 'stop' ? { mark: '!', bg: '#fdecec', fg: '#b3261e', bd: '#f3b9b4' }
       : { mark: String(n), bg: '#ffffff', fg: '#68758d', bd: '#cfd8e6' };
     return [
-      { label: 'Part 135 certificate matched to the FAA list', hint: certHint, ...look(c.certOk, 1) },
-      { label: 'An aircraft matched to the FAA registry and your certificate', hint: acHint, ...look(c.cleared.length > 0, 2) }
+      { label: 'Part 135 certificate matched to the FAA list', hint: certHint, ...look(c.certOk ? 'done' : 'todo', 1) },
+      { label: 'An aircraft matched to the FAA registry and your certificate', hint: acHint, ...look(c.cleared.length ? 'done' : 'todo', 2) },
+      { label: 'Account confirmed by the Chartavia team', hint: reviewHint,
+        ...look(c.review === 'approved' ? 'done' : c.review === 'declined' ? 'stop' : c.autoOk ? 'wait' : 'todo', 3) }
     ];
   }
 
@@ -153,6 +162,7 @@ class Component extends DCLogic {
     return this.api('/api/bootstrap').then(d => {
       this.me = d.me;
       this.desk = d.concierge || null;
+      this.review = d.review || null;
       this.partner = d.partner || null;
       const initials = (d.me.name || '??').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
       if (!this.state.menuOpen) {
@@ -462,6 +472,17 @@ class Component extends DCLogic {
       .catch(e => this.setState({ prMsg: e.message }))
       .then(() => { this._certing = false; });
   }
+  uploadSafetyDoc(file) {
+    if (this._safetying) return;
+    this._safetying = true;
+    const fd = new FormData();
+    fd.append('file', file);
+    fetch('/api/operator/safety-doc', { method: 'POST', body: fd })
+      .then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || 'Upload failed'); return d; }))
+      .then(d => { this.setState({ prMsg: 'Audit certificate uploaded: ' + d.name + '. We will confirm your rating against it.' }); this.loadData(); })
+      .catch(e => this.setState({ prMsg: e.message }))
+      .then(() => { this._safetying = false; });
+  }
   uploadAircraftPhoto(id, file) {
     const fd = new FormData();
     fd.append('file', file);
@@ -517,6 +538,21 @@ class Component extends DCLogic {
     this.api('/api/concierge', { body: { topic: s.conTopic, requestId: s.conReqId, phone: s.conPhone, message: s.conMsg } })
       .then(d => this.setState({ conBusy: false, conDone: d.ref || 'sent' }))
       .catch(e => this.setState({ conBusy: false, conErr: e.message || 'Could not send. Try again.' }));
+  }
+  // Staff decisions on an operator. An edited note rides along with any action.
+  staffOp(orgId, action, extra) {
+    if (this._staffing) return;
+    this._staffing = true;
+    const note = this.state.opNotes[orgId];
+    this.api('/api/staff/operators/' + orgId, { body: { action, ...(extra || {}), ...(note != null ? { note } : {}) } })
+      .then(d => {
+        this.review = d.review;
+        const opNotes = { ...this.state.opNotes };
+        delete opNotes[orgId];
+        this.setState({ opNotes, staffMsg: '' });
+      })
+      .catch(e => this.setState({ staffMsg: e.message }))
+      .then(() => { this._staffing = false; });
   }
   staffSet(id, status) {
     this.api('/api/staff/concierge/' + id, { body: { status } })
@@ -648,6 +684,7 @@ class Component extends DCLogic {
     const rfqBid = rfq ? s.opBids[rfq.id] : null;
     const inboxChat = s.role === 'operator' ? s.inbox.find(c => c.quoteId === s.chatWith) : null;
     const gateOk = !!(this.opProfile && this.opProfile.clearance && this.opProfile.clearance.ok);
+    const gateWhy = this.opProfile && this.opProfile.clearance ? this.opProfile.clearance.reason : null;
     const opIsAdmin = !!(this.opProfile && this.opProfile.team && this.opProfile.team.myOrgRole === 'admin');
 
     // The signed-in account's role is authoritative: the header toggle only
@@ -692,7 +729,9 @@ class Component extends DCLogic {
       prBase: s.prBase, onPrBase: e => this.setState({ prBase: e.target.value }),
       saveOpProfile: () => this.saveOpProfile(),
       prFleet: (this.opProfile ? this.opProfile.fleet : []).map(a => {
-        const st = a.faa_status === 'verified' && a.on_cert === 0 ? { label: 'NOT ON CERTIFICATE', bg: '#fdecec', fg: '#b3261e' }
+        const staffCleared = a.staff_ok === 1 && ['verified', 'found', 'mismatch'].includes(a.faa_status);
+        const st = staffCleared ? { label: 'CLEARED BY CHARTAVIA', bg: '#e8f6ee', fg: '#1e5e3c' }
+          : a.faa_status === 'verified' && a.on_cert === 0 ? { label: 'NOT ON CERTIFICATE', bg: '#fdecec', fg: '#b3261e' }
           : a.faa_status === 'verified' ? { label: 'FAA MATCH', bg: '#e8f6ee', fg: '#1e5e3c' }
           : a.faa_status === 'found' ? { label: 'ON REGISTRY', bg: '#eef3fd', fg: '#2E6BE6' }
           : a.faa_status === 'mismatch' ? { label: 'MODEL MISMATCH', bg: '#fdecec', fg: '#b3261e' }
@@ -705,6 +744,8 @@ class Component extends DCLogic {
           faaInfo: a.faa_model
             ? 'FAA registry: ' + (a.faa_mfr || '') + ' ' + a.faa_model
               + (a.on_cert === 1 ? ' · on your 135 certificate' : a.on_cert === 0 ? ' · NOT on your 135 certificate' : '')
+              + (staffCleared ? ' · cleared by our team against your documents'
+                : (a.on_cert === 0 || a.faa_status === 'found') ? ' · the partner desk can clear it against your D085' : '')
             : false,
           showRemove: isAdm,
           onRemove: () => this.removeAircraft(a.id),
@@ -729,6 +770,19 @@ class Component extends DCLogic {
       safetyOpts: ['ARGUS Gold', 'ARGUS Gold+', 'ARGUS Platinum', 'Wyvern Registered', 'Wyvern Wingman', 'IS-BAO Stage 1', 'IS-BAO Stage 2', 'IS-BAO Stage 3'].map(label => ({
         label, ...this.chipStyle(s.prSafety === label), onPick: () => this.pickSafety(label)
       })),
+      ...(() => {
+        const pr = (this.opProfile && this.opProfile.profile) || {};
+        const confirmed = !!pr.safety_program && pr.safety_verified === pr.safety_program;
+        return {
+          safetyHint: !pr.safety_program ? 'Pick your current rating, then upload the audit certificate. It appears on your quotes once our team has confirmed it.'
+            : confirmed ? 'Confirmed against your audit certificate. Shown on your quotes and empty legs. Tap again to clear.'
+            : pr.safety_doc_name ? 'Awaiting confirmation by our team. Not shown to travelers yet.'
+            : 'Not shown to travelers yet. Upload your audit certificate so our team can confirm it.',
+          safetyHintFg: confirmed ? '#1e5e3c' : pr.safety_program ? '#8a6b2e' : '#8593ab',
+          hasSafetyDoc: !!pr.safety_doc_name, safetyDocName: pr.safety_doc_name || '',
+          onSafetyDocFile: e => { const f = e.target.files && e.target.files[0]; if (f) { this.uploadSafetyDoc(f); e.target.value = ''; } },
+        };
+      })(),
       onCertDocFile: e => { const f = e.target.files && e.target.files[0]; if (f) { this.uploadCertDoc(f); e.target.value = ''; } },
       certDocName: (this.opProfile && this.opProfile.profile && this.opProfile.profile.cert_doc_name) || '',
       hasCertDoc: !!(this.opProfile && this.opProfile.profile && this.opProfile.profile.cert_doc_name),
@@ -878,7 +932,7 @@ class Component extends DCLogic {
         const cleared = this.quotable();
         if (!cleared.length) {
           this.setState({ profileOpen: true, menuOpen: false,
-            prMsg: 'Empty legs can be posted once your certificate and an aircraft pass the FAA check.' });
+            prMsg: 'Empty legs can be posted once your certificate, an aircraft and your account review are complete.' });
           return;
         }
         this.setState({ legFormOpen: true, legMsg: '', legAircraft: 'tail:' + cleared[0].tail, menuOpen: false });
@@ -1050,9 +1104,94 @@ class Component extends DCLogic {
       showStaff: !!s.staffOpen,
       goStaff: () => this.setState({ staffOpen: true, chatWith: null, menuOpen: false }),
       navStaffBg: s.staffOpen ? 'rgba(255,255,255,.13)' : 'transparent', navStaffFg: s.staffOpen ? '#ffffff' : '#b7c4dc',
-      staffNewCount: this.desk ? this.desk.newCount : 0,
-      staffEmpty: !this.desk || !this.desk.items.length,
-      staffRows: (this.desk ? this.desk.items : []).map(c => {
+      staffNewCount: (this.desk ? this.desk.newCount : 0) + (this.review ? this.review.readyCount + this.review.ratingCount : 0),
+      staffTitle: 'Staff desk',
+      staffSub: s.staffTab === 'operators'
+        ? 'Approve operators before their first quote, clear aircraft the FAA data misses, and confirm safety ratings against the audit certificate.'
+        : 'Messages from travelers, operators and the public page. Reply by email or phone, then mark them handled.',
+      staffTabs: [
+        ['messages', 'Messages', this.desk ? this.desk.newCount : 0],
+        ['operators', 'Operators', this.review ? this.review.readyCount + this.review.ratingCount : 0]
+      ].map(([id, label, count]) => {
+        const on = s.staffTab === id;
+        return {
+          label, count, onPick: () => this.setState({ staffTab: id, staffMsg: '' }),
+          bg: on ? '#16233b' : '#ffffff', fg: on ? '#ffffff' : '#4a5a76', bd: on ? '#16233b' : '#dde5f0',
+          cBg: count ? '#c6a667' : (on ? 'rgba(255,255,255,.16)' : '#eef2f8'), cFg: count ? '#16233b' : (on ? '#ffffff' : '#68758d')
+        };
+      }),
+      staffMsg: s.staffMsg || false,
+      staffTabOps: s.staffTab === 'operators',
+      staffOpsEmpty: s.staffTab === 'operators' && (!this.review || !this.review.items.length),
+      staffOps: (s.staffTab === 'operators' && this.review ? this.review.items : []).map(o => {
+        const c = o.clearance;
+        const stage = {
+          ready: { stLabel: 'READY FOR REVIEW', stBg: '#c6a667', stFg: '#16233b', bd: '#c6a667' },
+          rating: { stLabel: 'RATING TO CONFIRM', stBg: '#c6a667', stFg: '#16233b', bd: '#c6a667' },
+          approved: { stLabel: 'APPROVED', stBg: '#e8f6ee', stFg: '#1e5e3c', bd: '#e3e9f2' },
+          declined: { stLabel: 'DECLINED', stBg: '#fdecec', stFg: '#b3261e', bd: '#e3e9f2' },
+          incomplete: { stLabel: 'CHECKS INCOMPLETE', stBg: '#eef2f8', stFg: '#68758d', bd: '#e3e9f2' }
+        }[o.stage];
+        const look = (state, n) => state === 'done' ? { mark: '✓', bg: '#e8f6ee', fg: '#1e5e3c', bd: '#9fd8b6' }
+          : state === 'stop' ? { mark: '!', bg: '#fdecec', fg: '#b3261e', bd: '#f3b9b4' }
+          : { mark: String(n), bg: '#ffffff', fg: '#68758d', bd: '#cfd8e6' };
+        const note = s.opNotes[o.orgId];
+        return {
+          ...stage, company: o.company,
+          certLine: o.cert ? 'Certificate ' + o.cert + (o.faaName ? ' · FAA list: ' + o.faaName : ' · not on the FAA list') : 'No certificate number entered',
+          holderLine: ['Account: ' + o.holder, o.email, o.base ? 'base ' + o.base : '', o.members ? o.members + ' team member' + (o.members > 1 ? 's' : '') : '', 'joined ' + o.joined].filter(Boolean).join(' · '),
+          waiting: o.waiting ? 'Waiting since ' + o.waiting : false,
+          steps: [
+            { label: 'Certificate on the FAA Part 135 list', hint: o.faaName ? 'The company typed "' + o.company + '"; the FAA lists ' + o.faaName + '.' : 'No match yet.', ...look(c.certOk ? 'done' : 'todo', 1) },
+            { label: 'Aircraft cleared to offer', hint: c.cleared.length ? c.cleared.join(', ') : 'None yet.', ...look(c.cleared.length ? 'done' : 'todo', 2) },
+            { label: 'Account confirmed by staff', hint: o.review === 'approved' ? 'Approved for ' + o.cert + '.' : o.review === 'declined' ? 'Declined.' : 'Your decision. The FAA data cannot show who is behind the account.',
+              ...look(o.review === 'approved' ? 'done' : o.review === 'declined' ? 'stop' : 'todo', 3) }
+          ],
+          noFleet: !o.fleet.length,
+          fleet: o.fleet.map(a => {
+            const st = a.cleared && a.staffOk ? { label: 'CLEARED BY STAFF', bg: '#e8f6ee', fg: '#1e5e3c' }
+              : a.cleared ? { label: 'CLEARED', bg: '#e8f6ee', fg: '#1e5e3c' }
+              : a.status === 'verified' && a.onCert === 0 ? { label: 'NOT ON CERTIFICATE', bg: '#fdecec', fg: '#b3261e' }
+              : a.status === 'verified' ? { label: 'REGISTRY MATCH', bg: '#eef3fd', fg: '#2E6BE6' }
+              : a.status === 'found' ? { label: 'MODEL NOT MATCHED', bg: '#eef3fd', fg: '#2E6BE6' }
+              : a.status === 'mismatch' ? { label: 'MODEL MISMATCH', bg: '#fdecec', fg: '#b3261e' }
+              : a.status === 'not_found' ? { label: 'NOT ON REGISTRY', bg: '#fdecec', fg: '#b3261e' }
+              : { label: 'UNCHECKED', bg: '#eef2f8', fg: '#68758d' };
+            return {
+              tail: a.tail, model: a.model, status: st.label, statusBg: st.bg, statusFg: st.fg,
+              faa: a.faaModel ? 'FAA registry: ' + (a.faaMfr || '') + ' ' + a.faaModel : 'The operator has not run the FAA check on this tail.',
+              canClear: a.canClear, canUnclear: a.staffOk,
+              onClear: () => this.staffOp(o.orgId, 'clear_aircraft', { aircraftId: a.id }),
+              onUnclear: () => this.staffOp(o.orgId, 'unclear_aircraft', { aircraftId: a.id })
+            };
+          }),
+          noDocs: !o.docs.length,
+          docs: o.docs.map(d => ({ label: d.label, name: d.name, href: '/api/staff/operators/' + o.orgId + '/doc/' + d.kind })),
+          ratingLine: o.rating.claimed
+            ? 'Claims ' + o.rating.claimed + (o.rating.confirmed ? ' · confirmed, shown to travelers' : o.rating.hasDoc ? ' · audit certificate on file, not confirmed, hidden from travelers' : ' · no audit certificate uploaded, hidden from travelers')
+            : false,
+          canConfirmRating: !!o.rating.claimed && o.rating.hasDoc && !o.rating.confirmed,
+          canUnconfirmRating: o.rating.confirmed,
+          onConfirmRating: () => this.staffOp(o.orgId, 'confirm_rating'),
+          onUnconfirmRating: () => this.staffOp(o.orgId, 'unconfirm_rating'),
+          note: note != null ? note : o.note,
+          onNote: e => this.setState({ opNotes: { ...s.opNotes, [o.orgId]: e.target.value } }),
+          noteDirty: note != null && note !== o.note,
+          onSaveNote: () => this.staffOp(o.orgId, 'note'),
+          canApprove: o.review !== 'approved' && c.certOk,
+          approveBlocked: o.review !== 'approved' && !c.certOk ? 'Approval is recorded against a certificate, so it opens once the number matches the FAA list.' : false,
+          canDecline: o.review === 'pending',
+          canRevoke: o.review !== 'pending',
+          revokeLabel: o.review === 'approved' ? 'Withdraw approval' : 'Reopen review',
+          onApprove: () => this.staffOp(o.orgId, 'approve'),
+          onDecline: () => this.staffOp(o.orgId, 'decline'),
+          onRevoke: () => this.staffOp(o.orgId, 'revoke'),
+          mailHref: 'mailto:' + o.email + '?subject=' + encodeURIComponent('Your Chartavia operator account'),
+          last: o.last || false
+        };
+      }),
+      staffEmpty: s.staffTab === 'messages' && (!this.desk || !this.desk.items.length),
+      staffRows: (s.staffTab === 'messages' && this.desk ? this.desk.items : []).map(c => {
         const st = c.status === 'new' ? { stLabel: 'NEW', stBg: '#c6a667', stFg: '#16233b', bd: '#c6a667' }
           : c.status === 'open' ? { stLabel: 'IN PROGRESS', stBg: '#eef3fd', stFg: '#2E6BE6', bd: '#e3e9f2' }
           : { stLabel: 'HANDLED', stBg: '#eef2f8', stFg: '#68758d', bd: '#e3e9f2' };
@@ -1215,12 +1354,23 @@ class Component extends DCLogic {
       // FAA verification gate
       bidGate: !rfqBid && !gateOk,
       gateSteps: this.gateSteps(),
-      gateCta: opIsAdmin ? 'Complete verification' : 'View operator profile',
+      gateKicker: gateWhy === 'review_pending' ? 'IN REVIEW' : gateWhy === 'review_declined' ? 'ACCOUNT REVIEW' : 'VERIFICATION REQUIRED',
+      gateTitle: gateWhy === 'review_pending' ? 'Your account is with the Chartavia team'
+        : gateWhy === 'review_declined' ? 'We could not approve this account yet'
+        : 'Quoting opens once you are verified',
+      gateBody: gateWhy === 'review_pending'
+        ? 'Your certificate and aircraft passed the FAA checks. Before your first quote, a member of our team confirms that this account belongs to the certificate holder. You can review every request in the meantime.'
+        : gateWhy === 'review_declined'
+        ? 'Quoting stays locked until we can confirm this account belongs to the certificate holder. Message the partner desk and we will work through it with you.'
+        : 'Travelers on Chartavia only receive offers from verified Part 135 operators. You can review every request now; sealed quotes unlock when the three checks below are complete.',
+      gateCta: opIsAdmin && gateWhy !== 'review_pending' && gateWhy !== 'review_declined' ? 'Complete verification' : 'View operator profile',
       gateMember: !opIsAdmin,
-      gateHeadline: gateOk ? 'Cleared to quote' : 'Quoting is locked',
+      gateHeadline: gateOk ? 'Cleared to quote' : gateWhy === 'review_pending' ? 'In review' : gateWhy === 'review_declined' ? 'Not approved yet' : 'Quoting is locked',
       gateSub: gateOk
         ? 'You can send sealed quotes and post empty legs with your cleared aircraft.'
-        : 'Sealed quotes and empty legs open once both checks below pass.',
+        : gateWhy === 'review_pending' ? 'The automatic checks passed. Quoting opens when our team approves your account.'
+        : gateWhy === 'review_declined' ? 'Message the partner desk from the bid desk and we will work through it with you.'
+        : 'Sealed quotes and empty legs open once the three checks below pass.',
       gateBg: gateOk ? '#f1faf5' : '#fbf8f0', gateBd: gateOk ? '#9fd8b6' : '#e6dcc3', gateFg: gateOk ? '#1e5e3c' : '#8a6b2e',
       fleet: this.quotable().map(a => ({ id: 'tail:' + a.tail, label: a.model_claim + ' — ' + a.tail })),
       bidAircraft: s.bidAircraft, onBidAircraft: e => this.setState({ bidAircraft: e.target.value }),

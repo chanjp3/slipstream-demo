@@ -242,11 +242,13 @@ async function handleApi(request, env, path) {
     if (path === '/api/operator/fleet' && method === 'POST') return await apiAddAircraft(request, env, me);
     if ((m = path.match(/^\/api\/operator\/fleet\/(\d+)\/delete$/)) && method === 'POST')
       return await apiRemoveAircraft(env, me, +m[1]);
-    if (path === '/api/operator/verify' && method === 'POST') return await apiVerifyFleet(env, me);
+    if (path === '/api/operator/verify' && method === 'POST') return await apiVerifyFleet(env, me, request);
     if (path === '/api/operator/d085' && method === 'POST') return await apiUploadD085(request, env, me);
     if (path === '/api/operator/d085' && method === 'GET') return await apiGetD085(env, me);
     if (path === '/api/operator/certificate' && method === 'POST') return await apiUploadCertDoc(request, env, me);
     if (path === '/api/operator/certificate' && method === 'GET') return await apiGetCertDoc(env, me);
+    if (path === '/api/operator/safety-doc' && method === 'POST') return await apiUploadSafetyDoc(request, env, me);
+    if (path === '/api/operator/safety-doc' && method === 'GET') return await apiGetSafetyDoc(env, me);
     if ((m = path.match(/^\/api\/operator\/fleet\/(\d+)\/photo$/)) && method === 'POST')
       return await apiUploadAircraftPhoto(request, env, me, +m[1]);
     if ((m = path.match(/^\/api\/fleet\/(\d+)\/photo$/)) && method === 'GET')
@@ -260,6 +262,10 @@ async function handleApi(request, env, path) {
       return await apiSetTripExpenses(request, env, me, +m[1]);
     if ((m = path.match(/^\/api\/staff\/concierge\/(\d+)$/)) && method === 'POST')
       return await apiStaffConcierge(request, env, me, +m[1]);
+    if ((m = path.match(/^\/api\/staff\/operators\/(\d+)$/)) && method === 'POST')
+      return await apiStaffOperator(request, env, me, +m[1]);
+    if ((m = path.match(/^\/api\/staff\/operators\/(\d+)\/doc\/(certificate|d085|safety)$/)) && method === 'GET')
+      return await apiStaffOperatorDoc(env, me, +m[1], m[2]);
     if (path === '/api/bootstrap' && method === 'GET') return await apiBootstrap(env, me);
     if (path === '/api/requests' && method === 'POST') return await apiCreateRequest(request, env, me);
 
@@ -750,27 +756,49 @@ async function getOperatorProfile(env, userId) {
     cert_faa_name: profile.cert_faa_name,
     d085_name: profile.d085_name,
     fleet_n: fleet.length,
-    fleet_ok: fleet.filter((f) => f.faa_status === 'verified').length,
+    fleet_ok: fleet.filter(aircraftCleared).length,
   } : null);
   return { profile: profile || null, fleet, badge, clearance: quoteClearance(profile, fleet) };
 }
 
-// Sealed quotes and empty legs are reserved for operators who pass the FAA
-// check: the certificate number matches the FAA's Part 135 holders list, and the
-// aircraft offered matches the FAA registry and is listed on that certificate.
+// Sealed quotes and empty legs are reserved for operators who pass three
+// checks. Two are automatic: the certificate number matches the FAA's Part 135
+// holders list, and the aircraft offered matches the FAA registry and is listed
+// on that certificate. The third is a person: the FAA data proves a certificate
+// and its aircraft are real, not that the account holder works there, so a
+// member of staff approves each operator, for the certificate it was given on.
 function quoteClearance(profile, fleet) {
   const certOk = !!(profile && profile.cert_number && profile.cert_faa_name);
-  const cleared = certOk
-    ? fleet.filter((a) => a.faa_status === 'verified' && a.on_cert === 1).map((a) => a.tail)
-    : [];
+  const cleared = certOk ? fleet.filter(aircraftCleared).map((a) => a.tail) : [];
+  const autoOk = certOk && cleared.length > 0;
+  const decided = profile && profile.review_cert === profile.cert_number ? profile.review_status : null;
+  const review = decided === 'approved' || decided === 'declined' ? decided : 'pending';
   let reason = null;
   if (!certOk) reason = profile && profile.cert_number ? 'cert_unmatched' : 'cert_missing';
   else if (!fleet.length) reason = 'no_fleet';
   else if (!cleared.length) reason = 'no_cleared_aircraft';
-  return { ok: !reason, certOk, cleared, reason };
+  else if (review === 'declined') reason = 'review_declined';
+  else if (review !== 'approved') reason = 'review_pending';
+  return { ok: !reason, certOk, cleared, autoOk, review, reason };
 }
 
+// The FAA's published list lags a reissued D085 and the model alias map has
+// gaps, so staff can clear a tail the automatic checks cannot. It still has to
+// be a valid registration: a tail the registry does not know stays blocked.
+function aircraftCleared(a) {
+  if (a.faa_status === 'verified' && a.on_cert === 1) return true;
+  return a.staff_ok === 1 && STAFF_CLEARABLE.includes(a.faa_status);
+}
+const STAFF_CLEARABLE = ['verified', 'found', 'mismatch'];
+
+// SQL twins of aircraftCleared() and of "the rating staff confirmed is the one
+// claimed", for queries that scan fleet_aircraft as f and join the profile as p.
+const AC_CLEARED_SQL = "((f.faa_status = 'verified' AND f.on_cert = 1) OR (f.staff_ok = 1 AND f.faa_status IN ('verified', 'found', 'mismatch')))";
+const RATING_SQL = 'CASE WHEN p.safety_verified = p.safety_program THEN p.safety_program END AS safety_program';
+
 const CLEARANCE_MSG = {
+  review_pending: 'Your operator account is in review. Quoting opens as soon as the Chartavia team approves it.',
+  review_declined: 'Your operator account has not been approved. Message the partner desk from the bid desk and we will sort it out.',
   cert_missing: 'Quoting opens once your Part 135 certificate is verified. Add the certificate number in the operator profile.',
   cert_unmatched: 'Your certificate number is not on the FAA Part 135 holders list. Check the designator in the operator profile.',
   no_fleet: 'Add the aircraft you operate in the operator profile and run the FAA check to start quoting.',
@@ -826,6 +854,7 @@ async function apiSaveOperatorProfile(request, env, me) {
   const faa = cert
     ? await env.DB.prepare('SELECT name FROM faa135_operators WHERE dsgn = ?').bind(cert).first()
     : null;
+  const prev = await env.DB.prepare('SELECT cert_number, review_status FROM operator_profiles WHERE user_id = ?').bind(me.orgId).first();
   await env.DB.prepare(
     `INSERT INTO operator_profiles (user_id, company, cert_number, base_iata, safety_program, cert_faa_name, updated_at)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))
@@ -840,6 +869,17 @@ async function apiSaveOperatorProfile(request, env, me) {
        ELSE 0 END
      WHERE operator_id = ?2`
   ).bind(faa ? cert : '', me.orgId).run();
+  if (prev && prev.cert_number !== cert) {
+    // A staff decision and any aircraft clearance belong to the certificate they were made for.
+    await env.DB.prepare(
+      `UPDATE operator_profiles SET review_status = NULL, review_cert = NULL, reviewed_at = NULL, reviewed_by = NULL,
+         review_requested_at = NULL WHERE user_id = ?`
+    ).bind(me.orgId).run();
+    await env.DB.prepare('UPDATE fleet_aircraft SET staff_ok = 0, staff_ok_at = NULL, staff_ok_by = NULL WHERE operator_id = ?')
+      .bind(me.orgId).run();
+    if (prev.review_status) await logStaffAction(env, me.id, me.orgId, 'reset', 'certificate changed from ' + (prev.cert_number || 'none') + ' to ' + (cert || 'none'));
+  }
+  await maybeRequestReview(env, request, me.orgId);
   return json({ ok: true, certOk: certLooksValid(cert), faaName: faa ? faa.name : null });
 }
 
@@ -902,6 +942,46 @@ async function apiUploadCertDoc(request, env, me) {
   return json({ ok: true, name });
 }
 
+// The audit certificate behind a declared ARGUS / Wyvern / IS-BAO rating. The
+// rating reaches travelers only after staff confirm it against this document.
+async function apiUploadSafetyDoc(request, env, me) {
+  const err = requireOrgAdmin(me);
+  if (err) return err;
+  const form = await request.formData().catch(() => null);
+  const file = form ? form.get('file') : null;
+  if (!file || typeof file === 'string') return json({ error: 'Attach a file' }, 400);
+  if (file.size > D085_MAX_BYTES) return json({ error: 'File too large (max 10 MB)' }, 400);
+  const name = String(file.name || 'audit-certificate.pdf').slice(0, 120);
+  const sbuf = await file.arrayBuffer();
+  if (!sniffOk(sbuf, 'pdf')) return json({ error: 'File does not look like a PDF' }, 400);
+  await env.SLIPSTREAM_KV.put('safetydoc:' + me.orgId, sbuf, {
+    metadata: { name, type: file.type || 'application/pdf' },
+  });
+  await env.DB.prepare(
+    `INSERT INTO operator_profiles (user_id, safety_doc_name, safety_doc_at, updated_at)
+     VALUES (?1, ?2, datetime('now'), datetime('now'))
+     ON CONFLICT (user_id) DO UPDATE SET safety_doc_name = ?2, safety_doc_at = datetime('now'), updated_at = datetime('now')`
+  ).bind(me.orgId, name).run();
+  return json({ ok: true, name });
+}
+
+async function apiGetSafetyDoc(env, me) {
+  if (me.role !== 'operator') return json({ error: 'Operators only' }, 403);
+  return kvDocResponse(env, 'safetydoc:' + me.orgId, 'audit-certificate.pdf');
+}
+
+async function kvDocResponse(env, key, fallbackName) {
+  const { value, metadata } = await env.SLIPSTREAM_KV.getWithMetadata(key, 'arrayBuffer');
+  if (!value) return json({ error: 'No document uploaded' }, 404);
+  return new Response(value, {
+    headers: {
+      'content-type': (metadata && metadata.type) || 'application/pdf',
+      'content-disposition': 'inline; filename="' + ((metadata && metadata.name) || fallbackName).replace(/"/g, '') + '"',
+      'cache-control': 'no-store',
+    },
+  });
+}
+
 async function apiGetCertDoc(env, me) {
   if (me.role !== 'operator') return json({ error: 'Operators only' }, 403);
   const { value, metadata } = await env.SLIPSTREAM_KV.getWithMetadata('cert:' + me.orgId, 'arrayBuffer');
@@ -943,7 +1023,7 @@ async function apiRemoveAircraft(env, me, aircraftId) {
   return json({ ok: true });
 }
 
-async function apiVerifyFleet(env, me) {
+async function apiVerifyFleet(env, me, request) {
   const err = requireOrgAdmin(me);
   if (err) return err;
   const fleet = (await env.DB.prepare(
@@ -977,6 +1057,7 @@ async function apiVerifyFleet(env, me) {
     `INSERT INTO operator_profiles (user_id, checked_at, updated_at) VALUES (?1, datetime('now'), datetime('now'))
      ON CONFLICT (user_id) DO UPDATE SET checked_at = datetime('now')`
   ).bind(me.orgId).run();
+  await maybeRequestReview(env, request, me.orgId);
   return json({ ok: true, results });
 }
 
@@ -1120,6 +1201,187 @@ async function apiStaffConcierge(request, env, me, id) {
   return json({ ok: true, desk: await conciergeDesk(env) });
 }
 
+// ---------------------------------------------------------- operator review
+
+async function logStaffAction(env, actorId, orgId, action, detail) {
+  await env.DB.prepare('INSERT INTO staff_actions (actor_id, org_id, action, detail) VALUES (?, ?, ?, ?)')
+    .bind(actorId, orgId, action, detail || null).run();
+}
+
+// The first time an operator clears both automatic checks they join the review
+// queue, and staff hear about it once.
+async function maybeRequestReview(env, request, orgId) {
+  const op = await getOperatorProfile(env, orgId);
+  if (!op.profile || !op.clearance.autoOk || op.clearance.review !== 'pending' || op.profile.review_requested_at) return;
+  await env.DB.prepare("UPDATE operator_profiles SET review_requested_at = datetime('now') WHERE user_id = ?").bind(orgId).run();
+  if (!env.CONCIERGE_EMAIL) return;
+  const origin = new URL(request.url).origin;
+  await sendEmail(env, env.CONCIERGE_EMAIL, 'Operator ready for review: ' + (op.profile.company || op.profile.cert_faa_name), emailHtml(
+    'An operator is ready for review',
+    ['Their certificate and at least one aircraft passed the FAA checks. Confirm the account belongs to the certificate holder, then approve or decline it on the staff desk.'],
+    'Open the staff desk', origin + '/app',
+    { kicker: 'STAFF', rows: [['Operator', op.profile.company], ['FAA name', op.profile.cert_faa_name], ['Certificate', op.profile.cert_number], ['Cleared aircraft', op.clearance.cleared.join(', ')]] }
+  ));
+}
+
+const REVIEW_STAGE_ORDER = { ready: 0, rating: 1, incomplete: 2, declined: 3, approved: 4 };
+const STAFF_ACTION_LABELS = {
+  approve: 'Approved', decline: 'Declined', revoke: 'Approval withdrawn', clear_aircraft: 'Aircraft cleared',
+  unclear_aircraft: 'Aircraft clearance removed', confirm_rating: 'Rating confirmed', unconfirm_rating: 'Rating confirmation removed',
+  note: 'Note saved', reset: 'Review reset',
+};
+
+// Every operator company with what staff need to decide: who holds the account,
+// what the automatic checks found, the documents on file and the last action.
+async function operatorReviewDesk(env) {
+  const orgs = (await env.DB.prepare(
+    `SELECT u.id AS org_id, u.name AS holder, u.email AS holder_email, u.created_at AS joined,
+            (SELECT COUNT(*) FROM users m WHERE m.org_id = u.id AND m.id != u.id) AS members, p.*
+     FROM users u LEFT JOIN operator_profiles p ON p.user_id = u.id
+     WHERE u.role = 'operator' AND COALESCE(u.org_id, u.id) = u.id AND u.hash != 'x'
+     ORDER BY u.id DESC LIMIT 200`
+  ).all()).results;
+  const fleetRows = (await env.DB.prepare('SELECT * FROM fleet_aircraft ORDER BY id ASC LIMIT 5000').all()).results;
+  const actions = (await env.DB.prepare(
+    `SELECT a.org_id, a.action, a.detail, a.created_at, s.name AS actor
+     FROM staff_actions a LEFT JOIN users s ON s.id = a.actor_id ORDER BY a.id DESC LIMIT 500`
+  ).all()).results;
+
+  const items = orgs.map((o) => {
+    const profile = o.user_id ? o : null;
+    const fleet = fleetRows.filter((f) => f.operator_id === o.org_id);
+    const clearance = quoteClearance(profile, fleet);
+    const claimed = (profile && profile.safety_program) || null;
+    const ratingConfirmed = !!claimed && profile.safety_verified === claimed;
+    const ratingWaiting = !!claimed && !ratingConfirmed && !!profile.safety_doc_name;
+    const stage = clearance.review === 'approved' ? (ratingWaiting ? 'rating' : 'approved')
+      : clearance.review === 'declined' ? 'declined'
+      : clearance.autoOk ? 'ready' : (ratingWaiting ? 'rating' : 'incomplete');
+    const last = actions.find((a) => a.org_id === o.org_id);
+    return {
+      orgId: o.org_id, company: (profile && profile.company) || o.holder, holder: o.holder, email: o.holder_email,
+      joined: timeAgo(o.joined), members: o.members,
+      cert: (profile && profile.cert_number) || '', faaName: (profile && profile.cert_faa_name) || null,
+      base: (profile && profile.base_iata) || '',
+      badge: verificationBadge(profile ? { ...profile, fleet_n: fleet.length, fleet_ok: fleet.filter(aircraftCleared).length } : null),
+      clearance, stage, review: clearance.review,
+      waiting: profile && profile.review_requested_at && clearance.review === 'pending' ? timeAgo(profile.review_requested_at) : null,
+      fleet: fleet.map((f) => ({
+        id: f.id, tail: f.tail, model: f.model_claim, faaMfr: f.faa_mfr, faaModel: f.faa_model, status: f.faa_status,
+        onCert: f.on_cert, staffOk: f.staff_ok === 1, cleared: !!(profile && clearance.certOk && aircraftCleared(f)),
+        canClear: f.staff_ok !== 1 && STAFF_CLEARABLE.includes(f.faa_status) && !(f.faa_status === 'verified' && f.on_cert === 1),
+      })),
+      docs: [
+        ['certificate', 'Air carrier certificate', profile && profile.cert_doc_name],
+        ['d085', 'D085 aircraft listing', profile && profile.d085_name],
+        ['safety', 'Safety audit certificate', profile && profile.safety_doc_name],
+      ].filter((d) => d[2]).map((d) => ({ kind: d[0], label: d[1], name: d[2] })),
+      rating: { claimed, hasDoc: !!(profile && profile.safety_doc_name), confirmed: ratingConfirmed },
+      note: (profile && profile.review_note) || '',
+      last: last ? (STAFF_ACTION_LABELS[last.action] || last.action) + (last.detail ? ' (' + last.detail + ')' : '') + ' by ' + (last.actor || 'staff') + ' · ' + timeAgo(last.created_at) : null,
+    };
+  }).sort((a, b) => REVIEW_STAGE_ORDER[a.stage] - REVIEW_STAGE_ORDER[b.stage]);
+
+  return {
+    readyCount: items.filter((i) => i.stage === 'ready').length,
+    ratingCount: items.filter((i) => i.rating.claimed && i.rating.hasDoc && !i.rating.confirmed).length,
+    items,
+  };
+}
+
+async function apiStaffOperator(request, env, me, orgId) {
+  if (!me.isStaff) return json({ error: 'Not found' }, 404);
+  const b = await request.json().catch(() => null);
+  if (!b) return json({ error: 'Invalid request body' }, 400);
+  const org = await env.DB.prepare("SELECT id, name FROM users WHERE id = ? AND role = 'operator'").bind(orgId).first();
+  if (!org) return json({ error: 'Operator not found' }, 404);
+  const op = await getOperatorProfile(env, orgId);
+  if (!op.profile) return json({ error: 'This operator has not started a profile yet' }, 400);
+  const p = op.profile;
+  const company = p.company || org.name;
+  const origin = new URL(request.url).origin;
+  const mail = (subject, title, lines, rows) => notifyUser(env, orgId, subject, lines, origin + '/app', 'Open Chartavia',
+    { kicker: 'OPERATOR REVIEW', title, rows: [['Operator', company], ...(rows || [])] });
+  let detail = null;
+
+  if (b.action === 'approve' || b.action === 'decline') {
+    if (b.action === 'approve' && !op.clearance.certOk) {
+      return json({ error: 'Approve once the certificate number matches the FAA list. The approval is recorded against that certificate.' }, 400);
+    }
+    await env.DB.prepare(
+      `UPDATE operator_profiles SET review_status = ?, review_cert = cert_number, reviewed_at = datetime('now'), reviewed_by = ? WHERE user_id = ?`
+    ).bind(b.action === 'approve' ? 'approved' : 'declined', me.id, orgId).run();
+    detail = p.cert_number || null;
+    if (b.action === 'approve') {
+      await mail('Your operator account is approved', 'You are approved to quote', [
+        'A member of the Chartavia team has confirmed your operator account.',
+        op.clearance.autoOk
+          ? 'You can now send sealed quotes and post empty legs with your cleared aircraft.'
+          : 'Quoting opens as soon as one of your aircraft passes the FAA check.',
+      ], [['Certificate', p.cert_number]]);
+    } else {
+      await mail('About your operator account', 'We need a little more from you', [
+        'We could not yet confirm that this account belongs to the holder of certificate ' + (p.cert_number || 'on file') + ', so quoting stays locked for now.',
+        'Message the partner desk from the bid desk and we will sort it out with you.',
+      ]);
+    }
+  } else if (b.action === 'revoke') {
+    await env.DB.prepare(
+      `UPDATE operator_profiles SET review_status = NULL, review_cert = NULL, reviewed_at = datetime('now'), reviewed_by = ? WHERE user_id = ?`
+    ).bind(me.id, orgId).run();
+    if (op.clearance.review === 'approved') {
+      await mail('Quoting is paused on your operator account', 'Your account is back in review', [
+        'A member of the Chartavia team is re-checking your operator account, and quoting is paused until that is done.',
+        'Your existing quotes and conversations are not affected. Message the partner desk if you have questions.',
+      ]);
+    }
+  } else if (b.action === 'clear_aircraft' || b.action === 'unclear_aircraft') {
+    const ac = op.fleet.find((a) => a.id === +b.aircraftId);
+    if (!ac) return json({ error: 'Aircraft not found' }, 404);
+    if (b.action === 'clear_aircraft') {
+      if (!STAFF_CLEARABLE.includes(ac.faa_status)) {
+        return json({ error: ac.tail + ' has no valid FAA registration on record. The operator has to run the FAA check first.' }, 400);
+      }
+      await env.DB.prepare("UPDATE fleet_aircraft SET staff_ok = 1, staff_ok_at = datetime('now'), staff_ok_by = ? WHERE id = ?").bind(me.id, ac.id).run();
+      await mail(ac.tail + ' is cleared for quoting', ac.tail + ' is cleared', [
+        'A member of the Chartavia team reviewed ' + ac.tail + ' against your documents and cleared it.',
+        op.clearance.review === 'approved'
+          ? 'You can offer it on sealed quotes and empty legs now.'
+          : 'You can offer it on sealed quotes and empty legs once your account review is complete.',
+      ], [['Aircraft', ac.model_claim + ' · ' + ac.tail]]);
+    } else {
+      await env.DB.prepare('UPDATE fleet_aircraft SET staff_ok = 0, staff_ok_at = NULL, staff_ok_by = NULL WHERE id = ?').bind(ac.id).run();
+    }
+    detail = ac.tail;
+  } else if (b.action === 'confirm_rating' || b.action === 'unconfirm_rating') {
+    if (b.action === 'confirm_rating') {
+      if (!p.safety_program) return json({ error: 'This operator has not declared a rating' }, 400);
+      if (!p.safety_doc_name) return json({ error: 'Confirm a rating only against an uploaded audit certificate' }, 400);
+      await env.DB.prepare("UPDATE operator_profiles SET safety_verified = safety_program, safety_verified_at = datetime('now') WHERE user_id = ?").bind(orgId).run();
+      await mail('Your ' + p.safety_program + ' rating is confirmed', 'Your safety rating is confirmed', [
+        'We checked your audit certificate. ' + p.safety_program + ' now appears on your quotes and empty legs.',
+      ], [['Rating', p.safety_program]]);
+    } else {
+      await env.DB.prepare('UPDATE operator_profiles SET safety_verified = NULL, safety_verified_at = NULL WHERE user_id = ?').bind(orgId).run();
+    }
+    detail = p.safety_program || null;
+  } else if (b.action !== 'note') {
+    return json({ error: 'Unknown action' }, 400);
+  }
+
+  if (b.note != null) {
+    await env.DB.prepare('UPDATE operator_profiles SET review_note = ? WHERE user_id = ?').bind(String(b.note).slice(0, 1000), orgId).run();
+  }
+  await logStaffAction(env, me.id, orgId, b.action, detail);
+  return json({ ok: true, review: await operatorReviewDesk(env) });
+}
+
+async function apiStaffOperatorDoc(env, me, orgId, kind) {
+  if (!me.isStaff) return json({ error: 'Not found' }, 404);
+  const key = { certificate: 'cert:', d085: 'd085:', safety: 'safetydoc:' }[kind] + orgId;
+  return kvDocResponse(env, key, kind + '.pdf');
+}
+
 // Who operators see as their contact. Configurable per deployment; the default
 // is a role, not a person.
 function partnerContact(env) {
@@ -1142,17 +1404,16 @@ async function apiPublicStats(env) {
   } catch (e) { /* FAA tables not loaded in this database */ }
 
   const orgs = (await env.DB.prepare(
-    `SELECT p.cert_number, p.cert_faa_name, p.d085_name, p.safety_program, p.cert_doc_name,
-            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id) AS fleet_n,
-            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id AND f.faa_status = 'verified') AS fleet_ok,
-            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id AND f.faa_status = 'verified' AND f.on_cert = 1) AS fleet_cleared
+    `SELECT p.cert_number, p.cert_faa_name, p.review_status, p.review_cert, ${RATING_SQL},
+            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id AND ${AC_CLEARED_SQL}) AS fleet_cleared
      FROM operator_profiles p`
   ).all()).results;
-  // Same bar as quoting: certificate on the FAA list and at least one cleared aircraft.
-  const verified = orgs.filter((o) => o.cert_number && o.cert_faa_name && o.fleet_cleared > 0);
+  // Same bar as quoting: certificate on the FAA list, a cleared aircraft, approved by staff.
+  const verified = orgs.filter((o) => o.cert_number && o.cert_faa_name && o.fleet_cleared > 0
+    && o.review_status === 'approved' && o.review_cert === o.cert_number);
   if (verified.length >= min) out.verifiedOperators = verified.length;
-  // Ratings are operator-declared; only count ones backed by an uploaded certificate.
-  out.ratings = [...new Set(verified.filter((o) => o.safety_program && o.cert_doc_name).map((o) => o.safety_program))];
+  // Only ratings staff confirmed against the operator's audit certificate.
+  out.ratings = [...new Set(verified.filter((o) => o.safety_program).map((o) => o.safety_program))];
 
   // Seed accounts (hash 'x', unloginable) are placeholders, not activity.
   const trips = await env.DB.prepare(
@@ -1244,7 +1505,8 @@ async function tripDocPage(request, env, session, requestId) {
     + '</tbody></table></section>'
     + '<section class="grid"><div><div class="k">Aircraft and operator</div>' + kv([
       ['Operator', company], ['Aircraft', acName], ['Registration', acTail], ['Seats', acSeats && String(acSeats)],
-      ['Part 135 certificate', cert], ['FAA check', op.badge], ['Safety rating (operator-declared)', op.profile && op.profile.safety_program],
+      ['Part 135 certificate', cert], ['FAA check', op.badge],
+      ['Safety rating (audit certificate confirmed)', op.profile && op.profile.safety_program && op.profile.safety_verified === op.profile.safety_program ? op.profile.safety_program : null],
     ]) + '</div><div><div class="k">Travel party</div>' + kv([
       ['Traveler', req.client_name], ['Passengers', String(req.pax)],
       ['Requested cabin', list(req.cats).map((c) => CAT_LABELS[c] || c).join(', ')],
@@ -1394,6 +1656,7 @@ async function apiBootstrap(env, me) {
     return json({
       me: meOut, requests: await clientRequests(env, me), emptyLegs: await emptyLegBoard(env),
       concierge: me.isStaff ? await conciergeDesk(env) : null,
+      review: me.isStaff ? await operatorReviewDesk(env) : null,
     });
   }
   // The plan is org-wide: members inherit the admin's plan.
@@ -1411,6 +1674,11 @@ async function apiBootstrap(env, me) {
     meOut.stats = { sent: st.sent, won: st.won };
   }
   const profile = await getOperatorProfile(env, me.orgId);
+  if (profile.profile) {
+    // Staff notes and who reviewed are internal.
+    const { review_note, reviewed_by, ...visible } = profile.profile;
+    profile.profile = visible;
+  }
   profile.team = await getTeam(env, me);
   return json({
     me: meOut,
@@ -1421,6 +1689,7 @@ async function apiBootstrap(env, me) {
     analytics: await operatorAnalytics(env, me),
     partner: partnerContact(env),
     concierge: me.isStaff ? await conciergeDesk(env) : null,
+    review: me.isStaff ? await operatorReviewDesk(env) : null,
   });
 }
 
@@ -1494,7 +1763,7 @@ async function clientRequests(env, me) {
 
   const quotes = (await env.DB.prepare(
     `SELECT q.*, u.name AS operator_name,
-            p.company AS op_company, p.cert_number, p.cert_faa_name, p.d085_name, p.safety_program,
+            p.company AS op_company, p.cert_number, p.cert_faa_name, p.d085_name, ${RATING_SQL},
             (SELECT plan FROM users WHERE id = COALESCE(u.org_id, u.id)) AS org_plan,
             (SELECT ROUND(AVG(rv.stars), 1) FROM reviews rv
              WHERE rv.operator_org = COALESCE(u.org_id, u.id)) AS avg_rating,
@@ -1507,7 +1776,7 @@ async function clientRequests(env, me) {
              AND f.photo_at IS NOT NULL AND instr(q.aircraft, f.tail || '|') = 1) AS photo_ac_id,
             (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = COALESCE(u.org_id, u.id)) AS fleet_n,
             (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = COALESCE(u.org_id, u.id)
-             AND f.faa_status = 'verified') AS fleet_ok,
+             AND ${AC_CLEARED_SQL}) AS fleet_ok,
             (SELECT COUNT(*) FROM messages m WHERE m.quote_id = q.id AND m.sender_id != ?1
              AND m.created_at > COALESCE((SELECT cr.last_read_at FROM chat_reads cr
                                           WHERE cr.quote_id = q.id AND cr.user_id = ?1), '')) AS unread
@@ -1902,14 +2171,14 @@ async function apiRemoveEmptyLeg(env, me, legId) {
 // Open, not-yet-flown legs with the operator's trust info, for the client board.
 async function emptyLegBoard(env) {
   const rows = (await env.DB.prepare(
-    `SELECT e.*, p.company, p.safety_program, p.cert_number, p.cert_faa_name, p.d085_name,
+    `SELECT e.*, p.company, ${RATING_SQL}, p.cert_number, p.cert_faa_name, p.d085_name,
             (SELECT ROUND(AVG(rv.stars), 1) FROM reviews rv WHERE rv.operator_org = e.operator_org) AS avg_rating,
             (SELECT COUNT(*) FROM reviews rv WHERE rv.operator_org = e.operator_org) AS review_n,
             (SELECT f.id FROM fleet_aircraft f WHERE f.operator_id = e.operator_org
              AND f.photo_at IS NOT NULL AND instr(e.aircraft, f.tail || '|') = 1) AS photo_ac_id,
             (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = e.operator_org) AS fleet_n,
             (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = e.operator_org
-             AND f.faa_status = 'verified') AS fleet_ok,
+             AND ${AC_CLEARED_SQL}) AS fleet_ok,
             u.name AS poster_name
      FROM empty_legs e
      LEFT JOIN operator_profiles p ON p.user_id = e.operator_org

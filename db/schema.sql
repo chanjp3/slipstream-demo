@@ -73,6 +73,16 @@ CREATE TABLE IF NOT EXISTS operator_profiles (
   safety_program TEXT,                    -- ARGUS/Wyvern/IS-BAO rating (self-declared)
   cert_doc_name TEXT,                     -- uploaded air carrier certificate (KV cert:<org>)
   cert_doc_at TEXT,
+  safety_doc_name TEXT,                   -- uploaded safety audit certificate (KV safetydoc:<org>)
+  safety_doc_at TEXT,
+  safety_verified TEXT,                   -- the rating staff confirmed against that document; travelers see
+  safety_verified_at TEXT,                --   safety_program only while it equals this
+  review_status TEXT,                     -- staff decision: 'approved' | 'declined'; NULL = in review
+  review_cert TEXT,                       -- the certificate number the decision was made for (a change voids it)
+  review_note TEXT,                       -- internal staff note, never sent to the operator
+  reviewed_at TEXT,
+  reviewed_by INTEGER,
+  review_requested_at TEXT,               -- first time both automatic checks passed (staff notified once)
   d085_name TEXT,
   d085_at TEXT,
   checked_at TEXT,
@@ -91,8 +101,23 @@ CREATE TABLE IF NOT EXISTS fleet_aircraft (
   checked_at TEXT,
   photo_at TEXT,                          -- aircraft photo uploaded (bytes in KV acphoto:<id>)
   on_cert INTEGER,                        -- 1/0: tail is / is not on the org's certificate in the FAA list; NULL = no verified certificate
+  staff_ok INTEGER NOT NULL DEFAULT 0,    -- staff cleared this tail for quoting (FAA list lag, model alias gaps)
+  staff_ok_at TEXT,
+  staff_ok_by INTEGER,
   UNIQUE(operator_id, tail)
 );
+
+-- Who decided what about an operator: approvals, declines, aircraft clearances,
+-- rating confirmations, and resets caused by a certificate change.
+CREATE TABLE IF NOT EXISTS staff_actions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_id INTEGER NOT NULL,
+  org_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_staff_actions_org ON staff_actions(org_id, created_at);
 
 -- FAA Part 135 certificate holders and the aircraft on each certificate.
 -- Filled by db/faa135.sql (scripts/build-faa135.js rebuilds it from the FAA's

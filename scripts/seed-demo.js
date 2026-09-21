@@ -1,10 +1,13 @@
 // Generates db/seed-demo.sql: switchable demo personas (password: demopass123),
 // a fully verified operator org with fleet, marketplace requests, quotes,
 // chat, a completed+reviewed trip, and an empty leg — so the demo opens with
-// every feature visible. Northline is the counter-example: a new operator who
-// has not passed the FAA check, so the quoting gate can be seen.
+// every feature visible. Meridian and Bluewing are approved by staff. Northline
+// is the operator in the review queue: its FAA checks pass, one aircraft needs a
+// staff clearance (on the reissued D085, not yet in the FAA list) and its safety
+// rating awaits confirmation, so the staff persona has all three jobs to do.
 // For a fresh database only (messages and empty legs would duplicate on a re-run).
-// Load db/schema.sql and db/faa135.sql first.
+// Load db/schema.sql and db/faa135.sql first; afterwards run
+// scripts/seed-demo-docs.js so the documents named here exist in KV.
 // Usage: node scripts/seed-demo.js && npx wrangler d1 execute slipstream-demo-db --remote --file db/seed-demo.sql -y
 const fs = require('fs');
 const path = require('path');
@@ -59,24 +62,40 @@ INSERT INTO concierge_requests (user_id, name, email, phone, topic, message, sta
 INSERT OR IGNORE INTO faa135_operators (dsgn, name) VALUES
   ('MJGA085K', 'Meridian Jet Group'), ('BLWA221K', 'Bluewing Charters'), ('NRLA417K', 'Northline Air Charter');
 INSERT OR IGNORE INTO faa135_aircraft (dsgn, tail, mms) VALUES
-  ('MJGA085K', 'N502QS', NULL), ('MJGA085K', 'N510JK', NULL), ('BLWA221K', 'N1KE', NULL);
+  ('MJGA085K', 'N502QS', NULL), ('MJGA085K', 'N510JK', NULL), ('BLWA221K', 'N1KE', NULL), ('NRLA417K', 'N787QS', NULL);
 
--- Meridian: fully verified operator org (badge: FAA 135 verified)
-INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, d085_name, d085_at, checked_at, updated_at)
-VALUES (3, 'Meridian Jet Group', 'MJGA085K', 'Meridian Jet Group', 'TEB', 'ARGUS Platinum', 'meridian-d085.pdf', datetime('now'), datetime('now'), datetime('now'));
+-- Meridian: fully verified, approved by staff, ARGUS rating confirmed
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, safety_doc_name, safety_doc_at, safety_verified, safety_verified_at,
+  cert_doc_name, cert_doc_at, d085_name, d085_at, review_status, review_cert, review_note, reviewed_at, reviewed_by, checked_at, updated_at)
+VALUES (3, 'Meridian Jet Group', 'MJGA085K', 'Meridian Jet Group', 'TEB', 'ARGUS Platinum', 'meridian-argus-platinum.pdf', datetime('now'), 'ARGUS Platinum', datetime('now'),
+  'meridian-air-carrier-certificate.pdf', datetime('now'), 'meridian-d085.pdf', datetime('now'), 'approved', 'MJGA085K',
+  'Spoke with the Director of Operations on the number listed with the FAA.', datetime('now'), 10, datetime('now'), datetime('now'));
 INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, on_cert, checked_at)
 VALUES (1, 3, 'N502QS', 'Citation Latitude', 'TEXTRON AVIATION INC', '680A', 'Valid', 'verified', 1, datetime('now')),
        (2, 3, 'N510JK', 'Citation Mustang', 'CESSNA', '510', 'Valid', 'verified', 1, datetime('now'));
 
--- Bluewing: cert + fleet verified, D085 still pending
-INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, checked_at, updated_at)
-VALUES (5, 'Bluewing Charters', 'BLWA221K', 'Bluewing Charters', 'PBI', 'Wyvern Wingman', datetime('now'), datetime('now'));
+-- Bluewing: approved; D085 still pending; declares a rating with no audit
+-- certificate behind it, so travelers do not see it
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, review_status, review_cert, reviewed_at, reviewed_by, checked_at, updated_at)
+VALUES (5, 'Bluewing Charters', 'BLWA221K', 'Bluewing Charters', 'PBI', 'Wyvern Wingman', 'approved', 'BLWA221K', datetime('now'), 10, datetime('now'), datetime('now'));
 INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, on_cert, checked_at)
 VALUES (3, 5, 'N1KE', 'Gulfstream G650', 'GULFSTREAM AEROSPACE CORP', 'GVI', 'Valid', 'verified', 1, datetime('now'));
 
--- Northline: certificate matched, no aircraft yet, so quoting is still locked
-INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, updated_at)
-VALUES (11, 'Northline Air Charter', 'NRLA417K', 'Northline Air Charter', 'BED', datetime('now'));
+-- Northline: both FAA checks pass, waiting for staff. N415QS matches the registry
+-- but is not on the certificate in the FAA list (staff can clear it), and the
+-- declared rating has an audit certificate on file but is not confirmed yet.
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, safety_doc_name, safety_doc_at,
+  cert_doc_name, cert_doc_at, d085_name, d085_at, review_requested_at, checked_at, updated_at)
+VALUES (11, 'Northline Air Charter', 'NRLA417K', 'Northline Air Charter', 'BED', 'Wyvern Registered', 'northline-wyvern-registered.pdf', datetime('now'),
+  'northline-air-carrier-certificate.pdf', datetime('now'), 'northline-d085-reissued.pdf', datetime('now'), datetime('now', '-2 hours'), datetime('now'), datetime('now'));
+INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, on_cert, checked_at)
+VALUES (4, 11, 'N787QS', 'Challenger 350', 'BOMBARDIER INC', 'BD-100-1A10', 'Valid', 'verified', 1, datetime('now')),
+       (5, 11, 'N415QS', 'Gulfstream G450', 'GULFSTREAM AEROSPACE', 'GIV-X (G450)', 'Valid', 'verified', 0, datetime('now'));
+
+-- The staff persona (id 10) made the decisions above
+INSERT INTO staff_actions (actor_id, org_id, action, detail) SELECT 10, 3, 'approve', 'MJGA085K' WHERE NOT EXISTS (SELECT 1 FROM staff_actions);
+INSERT INTO staff_actions (actor_id, org_id, action, detail) SELECT 10, 5, 'approve', 'BLWA221K' WHERE (SELECT COUNT(*) FROM staff_actions) = 1;
+INSERT INTO staff_actions (actor_id, org_id, action, detail) SELECT 10, 3, 'confirm_rating', 'ARGUS Platinum' WHERE (SELECT COUNT(*) FROM staff_actions) = 2;
 
 -- Ava's completed + reviewed trip (gives Meridian a real rating & response time)
 INSERT OR IGNORE INTO requests (id, user_id, type, legs, pax, flex_days, cats, budget, needs, addons, notes, accepted_quote_id, trip_status, deposit_amount, deposit_status, created_at)

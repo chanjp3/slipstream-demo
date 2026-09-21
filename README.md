@@ -4,7 +4,7 @@
 > D1 databases, the `SLIPSTREAM_KV` binding, the `slipstream_session` cookie and the
 > `slip-*` CSS classes keep the old name so deployments, sessions and patch guards keep working.
 
-**This is the interactive demo deployment** of [Chartavia](https://github.com/chanjp3/slipstream): identical code, plus a persona switcher. Open the app and use the DEMO · VIEW AS bar at the bottom to jump between two clients, three verified operator seats (admin, team member, competitor), a new operator who has not passed the FAA check yet (Northline: the bid desk shows what is missing instead of the quote form), and the concierge staff desk — no logins needed. Post a request as Ava, switch to Meridian to quote it, switch back to accept. Personas are seeded by scripts/seed-demo.js (password demopass123 if you want the login flow); real registrations work but cannot be impersonated.
+**This is the interactive demo deployment** of [Chartavia](https://github.com/chanjp3/slipstream): identical code, plus a persona switcher. Open the app and use the DEMO · VIEW AS bar at the bottom to jump between two clients, three verified operator seats (admin, team member, competitor), a new operator waiting for staff review (Northline: its FAA checks pass, so the bid desk shows "in review" instead of the quote form), and the staff desk (Concierge · Staff: open Staff desk → Operators to clear Northline's second aircraft, confirm its safety rating and approve it, then switch back to Northline and quote) — no logins needed. Post a request as Ava, switch to Meridian to quote it, switch back to accept. Personas are seeded by scripts/seed-demo.js (password demopass123 if you want the login flow); real registrations work but cannot be impersonated.
 
 ---
 
@@ -138,11 +138,23 @@ that opens the shared chat drawer. Known gaps, in rough priority order:
   until the certificate matches and the aircraft offered is both registry-matched
   and on the certificate; the bid desk shows what is missing instead of the
   quote form. The D085 OpSpec is uploaded for the record and lifts the badge to
-  "FAA 135 verified". The FAA data proves the certificate and aircraft are real
-  and belong together, not that the account holder works for that operator —
-  pair with a manual D085 review before trusting. Refresh the dataset with
-  `scripts/build-faa135.js`; an aircraft added to a certificate after the last
-  refresh reads as "not on certificate" until then.
+  "FAA 135 verified". Refresh the dataset with `scripts/build-faa135.js`.
+- **Staff approval is the third check.** The FAA data proves the certificate and
+  aircraft are real and belong together, not that the account holder works for
+  that operator, so quoting also needs a staff decision. The staff desk
+  (`users.is_staff = 1`) has an Operators tab: account holder, the automatic
+  check results, the uploaded documents, an internal note, and Approve / Decline /
+  Withdraw. An approval is recorded against the certificate number, so changing
+  the number voids it. Operators join the queue on their own when both
+  automatic checks pass (`CONCIERGE_EMAIL`, if set, gets one email), and they
+  are emailed the decision. Every action lands in `staff_actions`.
+- **Staff can clear an aircraft** the automatic checks cannot: the FAA list lags
+  a reissued D085 and the model alias map has gaps. It needs a valid FAA
+  registration on record, and a certificate change voids it.
+- **Safety ratings are hidden until confirmed.** Operators declare ARGUS / Wyvern /
+  IS-BAO and upload the audit certificate; travelers see the rating only after
+  staff confirm it against that document (`safety_verified` must equal
+  `safety_program`, so changing the declared rating hides it again).
 - Ratings/reviews/response-time on quotes are still placeholders.
 - No email notifications, forgot-password reset flow, or rate limiting
   (password *change* exists in the account menu; *reset* needs email).

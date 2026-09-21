@@ -1249,6 +1249,124 @@ if (!newTemplate.includes('{{ bidGate }}')) {
   console.log('applied FAA verification gate markup patch');
 }
 
+// Operator review. The gate card's copy depends on which check is outstanding
+// (bundles patched earlier carry fixed text, so this pass runs every time), the
+// staff desk gains an Operators tab, and a declared safety rating gets its own
+// audit-certificate slot because travelers only see ratings staff confirmed.
+const GATE_COPY_BINDINGS = [
+  ['>FAA VERIFICATION REQUIRED</div>', '>{{ gateKicker }}</div>'],
+  ['>Quoting opens once you pass the FAA check</div>', '>{{ gateTitle }}</div>'],
+  ['>Travelers on Chartavia only receive offers from verified Part 135 operators. You can review every request now; sealed quotes unlock when both checks pass.</div>', '>{{ gateBody }}</div>'],
+];
+for (const [from, to] of GATE_COPY_BINDINGS) if (newTemplate.includes(from)) newTemplate = newTemplate.replace(from, () => to);
+
+const STAFF_LABEL = 'font-size:10.5px;font-weight:800;letter-spacing:1px;color:#8593ab;margin:16px 0 7px';
+const STAFF_BTN_DARK = 'border:none;cursor:pointer;background:#16233b;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800';
+const STAFF_BTN_LINE = 'border:1.5px solid #dde5f0;cursor:pointer;background:#fff;color:#16233b;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700';
+const STAFF_OPS = `<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+        <sc-for list="{{ staffTabs }}" as="t" hint-placeholder-count="2">
+          <button sc-camel-on-click="{{ t.onPick }}" style="display:flex;align-items:center;gap:7px;cursor:pointer;border:1.5px solid {{ t.bd }};background:{{ t.bg }};color:{{ t.fg }};border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:700">{{ t.label }}<span style="background:{{ t.cBg }};color:{{ t.cFg }};font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 7px">{{ t.count }}</span></button>
+        </sc-for>
+      </div>
+      <sc-if value="{{ staffMsg }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:12px;background:#fdecec;color:#b3261e;border-radius:8px;padding:9px 12px;font-size:12.5px;font-weight:600">{{ staffMsg }}</div>
+      </sc-if>
+      <sc-if value="{{ staffTabOps }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ staffOpsEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:20px;background:#fff;border:1.5px dashed #dde5f0;border-radius:14px;padding:22px;font-size:13px;color:#68758d;text-align:center">No operator accounts yet.</div>
+      </sc-if>
+      <div style="display:flex;flex-direction:column;gap:14px;margin-top:20px">
+      <sc-for list="{{ staffOps }}" as="o" hint-placeholder-count="2">
+        <div style="background:#fff;border:1.5px solid {{ o.bd }};border-radius:14px;padding:18px 20px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+            <div style="min-width:0">
+              <div style="font-size:15px;font-weight:800;color:#16233b">{{ o.company }}</div>
+              <div style="font-size:12px;color:#4a5a76;margin-top:3px">{{ o.certLine }}</div>
+              <div style="font-size:12px;color:#68758d;margin-top:2px">{{ o.holderLine }}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <sc-if value="{{ o.waiting }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:700;color:#8a6b2e">{{ o.waiting }}</span></sc-if>
+              <span style="font-size:10px;font-weight:800;letter-spacing:.6px;padding:3px 9px;border-radius:999px;background:{{ o.stBg }};color:{{ o.stFg }}">{{ o.stLabel }}</span>
+            </div>
+          </div>
+          <sc-for list="{{ o.steps }}" as="g" hint-placeholder-count="3">
+            ${GATE_STEP(18, 9.5, 9, 10, 12.5, 11.5)}
+          </sc-for>
+          <div style="${STAFF_LABEL}">AIRCRAFT</div>
+          <sc-if value="{{ o.noFleet }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#68758d">None listed yet.</div></sc-if>
+          <sc-for list="{{ o.fleet }}" as="a" hint-placeholder-count="2">
+            <div style="border:1.5px solid #e3e9f2;border-radius:10px;padding:9px 11px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+              <div style="min-width:0">
+                <div><span style="font-family:ui-monospace,Menlo,monospace;font-weight:800;font-size:12.5px;color:#16233b">{{ a.tail }}</span> <span style="font-size:12.5px;color:#4a5a76;font-weight:600">{{ a.model }}</span></div>
+                <div style="font-size:11px;color:#8593ab;margin-top:2px">{{ a.faa }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 8px;border-radius:999px;background:{{ a.statusBg }};color:{{ a.statusFg }}">{{ a.status }}</span>
+                <sc-if value="{{ a.canClear }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ a.onClear }}" style="${STAFF_BTN_DARK};padding:6px 11px;font-size:11.5px">Clear for quoting</button></sc-if>
+                <sc-if value="{{ a.canUnclear }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ a.onUnclear }}" style="${STAFF_BTN_LINE};padding:5px 10px;font-size:11.5px;color:#68758d">Remove clearance</button></sc-if>
+              </div>
+            </div>
+          </sc-for>
+          <div style="${STAFF_LABEL}">DOCUMENTS ON FILE</div>
+          <sc-if value="{{ o.noDocs }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#68758d">None uploaded. Ask for the air carrier certificate and D085 before approving.</div></sc-if>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ o.docs }}" as="d" hint-placeholder-count="2">
+              <a href="{{ d.href }}" target="_blank" style="display:flex;align-items:center;gap:7px;text-decoration:none;border:1.5px solid #dde5f0;background:#fff;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:700;color:#16233b"><span>📄</span><span>{{ d.label }}</span><span style="color:#2E6BE6;font-weight:800">Open</span></a>
+            </sc-for>
+          </div>
+          <sc-if value="{{ o.ratingLine }}" hint-placeholder-val="{{ false }}">
+            <div style="${STAFF_LABEL}">SAFETY RATING</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:12.5px;color:#4a5a76">{{ o.ratingLine }}</span>
+              <sc-if value="{{ o.canConfirmRating }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ o.onConfirmRating }}" style="${STAFF_BTN_DARK};padding:6px 11px;font-size:11.5px">Confirm rating</button></sc-if>
+              <sc-if value="{{ o.canUnconfirmRating }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ o.onUnconfirmRating }}" style="${STAFF_BTN_LINE};padding:5px 10px;font-size:11.5px;color:#68758d">Remove confirmation</button></sc-if>
+            </div>
+          </sc-if>
+          <div style="${STAFF_LABEL}">DECISION</div>
+          <textarea value="{{ o.note }}" sc-camel-on-change="{{ o.onNote }}" rows="2" placeholder="Internal note: how you confirmed the account holder. Never shown to the operator." style="width:100%;box-sizing:border-box;border:1.5px solid #dde5f0;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.5;resize:vertical;background:#fff;color:#16233b"></textarea>
+          <sc-if value="{{ o.approveBlocked }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#8593ab;margin-top:6px">{{ o.approveBlocked }}</div></sc-if>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <sc-if value="{{ o.canApprove }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ o.onApprove }}" style="border:none;cursor:pointer;background:#2E6BE6;color:#fff;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:800">Approve operator</button></sc-if>
+            <sc-if value="{{ o.canDecline }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ o.onDecline }}" style="${STAFF_BTN_LINE};color:#b3261e">Decline</button></sc-if>
+            <sc-if value="{{ o.canRevoke }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ o.onRevoke }}" style="${STAFF_BTN_LINE};color:#68758d">{{ o.revokeLabel }}</button></sc-if>
+            <sc-if value="{{ o.noteDirty }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ o.onSaveNote }}" style="${STAFF_BTN_LINE}">Save note</button></sc-if>
+            <a href="{{ o.mailHref }}" style="${STAFF_BTN_LINE};text-decoration:none">Email the account holder</a>
+          </div>
+          <sc-if value="{{ o.last }}" hint-placeholder-val="{{ false }}"><div style="font-size:11px;color:#8593ab;margin-top:10px">Last action: {{ o.last }}</div></sc-if>
+        </div>
+      </sc-for>
+      </div>
+      </sc-if>
+      `;
+const SAFETY_SLOT = `<div style="margin-top:5px;font-size:10.5px;line-height:1.5;color:{{ safetyHintFg }}">{{ safetyHint }}</div>
+    <sc-if value="{{ hasSafetyDoc }}" hint-placeholder-val="{{ false }}">
+    <a href="/api/operator/safety-doc" target="_blank" style="display:flex;align-items:center;gap:8px;text-decoration:none;border:1.5px solid #dde5f0;background:#fff;border-radius:10px;padding:9px 11px;margin-top:8px">
+      <div style="font-size:15px">📄</div>
+      <div style="flex:1;min-width:0;font-size:12.5px;font-weight:700;color:#16233b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ safetyDocName }}</div>
+      <div style="font-size:11.5px;font-weight:800;color:#2E6BE6">Open</div>
+    </a>
+    </sc-if>
+    <label style="display:block;cursor:pointer;border:1.5px dashed #b9c8e0;border-radius:10px;padding:9px;text-align:center;font-size:12px;font-weight:700;color:#2E6BE6;background:#fff;margin-top:8px">
+      Upload audit certificate (PDF)
+      <input type="file" accept=".pdf,application/pdf" sc-camel-on-change="{{ onSafetyDocFile }}" style="display:none">
+    </label>`;
+if (!newTemplate.includes('{{ staffTabOps }}')) {
+  const REVIEW_EDITS = [
+    ['color:#16233b">Concierge desk</h1>', 'color:#16233b">{{ staffTitle }}</h1>'],
+    ['>Messages from travelers, operators and the public page. Reply by email or phone, then mark them handled.</div>', '>{{ staffSub }}</div>'],
+    ['<sc-if value="{{ staffEmpty }}"', STAFF_OPS + '<sc-if value="{{ staffEmpty }}"'],
+    ['<div style="margin-top:5px;font-size:10.5px;color:#8593ab">Shown on your quotes. Tap again to clear. Upload your audit certificate below for the record.</div>', SAFETY_SLOT],
+  ];
+  for (const [from, to] of REVIEW_EDITS) {
+    if (newTemplate.split(from).length !== 2) throw new Error('operator review anchor not found exactly once: ' + from.slice(0, 70));
+    newTemplate = newTemplate.replace(from, () => to);
+  }
+  const navLabel = />Concierge desk(\s*<span style="background:#c6a667)/;
+  if (!navLabel.test(newTemplate)) throw new Error('staff nav label not found — template changed?');
+  newTemplate = newTemplate.replace(navLabel, (m, rest) => '>Staff desk' + rest);
+  console.log('applied operator review markup patch');
+}
+
 // Brand type: Quicksand for display text (headings, buttons, anything set
 // bold); Albert Sans stays for running text and inputs. The framework
 // re-serializes inline styles at runtime, hence the spaced "font-weight: 800".
