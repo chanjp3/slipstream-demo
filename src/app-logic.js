@@ -573,7 +573,7 @@ class Component extends DCLogic {
       profileOpen: s.profileOpen,
       profBadge: this.opProfile ? this.opProfile.badge : 'Unverified',
       profBadgeBg: this.opProfile && this.opProfile.badge === 'FAA-checked fleet' ? '#e8f6ee'
-        : this.opProfile && this.opProfile.badge !== 'Unverified' ? '#e7eefc' : '#eef2f8',
+        : this.opProfile && this.opProfile.badge !== 'Unverified' ? '#eef3fd' : '#eef2f8',
       profBadgeFg: this.opProfile && this.opProfile.badge === 'FAA-checked fleet' ? '#1e5e3c'
         : this.opProfile && this.opProfile.badge !== 'Unverified' ? '#2E6BE6' : '#68758d',
       prCompany: s.prCompany, onPrCompany: e => this.setState({ prCompany: e.target.value }),
@@ -582,7 +582,7 @@ class Component extends DCLogic {
       saveOpProfile: () => this.saveOpProfile(),
       prFleet: (this.opProfile ? this.opProfile.fleet : []).map(a => {
         const st = a.faa_status === 'verified' ? { label: 'FAA MATCH', bg: '#e8f6ee', fg: '#1e5e3c' }
-          : a.faa_status === 'found' ? { label: 'ON REGISTRY', bg: '#e7eefc', fg: '#2E6BE6' }
+          : a.faa_status === 'found' ? { label: 'ON REGISTRY', bg: '#eef3fd', fg: '#2E6BE6' }
           : a.faa_status === 'mismatch' ? { label: 'MODEL MISMATCH', bg: '#fdecec', fg: '#b3261e' }
           : a.faa_status === 'not_found' ? { label: 'NOT FOUND', bg: '#fdecec', fg: '#b3261e' }
           : { label: 'UNCHECKED', bg: '#eef2f8', fg: '#68758d' };
@@ -627,7 +627,7 @@ class Component extends DCLogic {
       teamMembers: (this.opProfile && this.opProfile.team ? this.opProfile.team.members : []).map(u => ({
         name: u.name, email: u.email,
         roleLabel: u.org_role === 'admin' ? 'ADMIN' : 'MEMBER',
-        roleBg: u.org_role === 'admin' ? '#e7eefc' : '#eef2f8',
+        roleBg: u.org_role === 'admin' ? '#eef3fd' : '#eef2f8',
         roleFg: u.org_role === 'admin' ? '#2E6BE6' : '#68758d',
         canRemove: !!(this.opProfile && this.opProfile.team && this.opProfile.team.myOrgRole === 'admin' && u.org_role !== 'admin'),
         onRemove: () => this.removeMember(u.id)
@@ -719,7 +719,7 @@ class Component extends DCLogic {
               route: this.routeStr(t), rid: t.rid,
               sub: this.fmtDate(t.legs[0].date) + ' · ' + t.client + ' · quoted by ' + t.member,
               status: (t.tripStatus || 'accepted').toUpperCase(),
-              statusBg: t.tripStatus === 'completed' ? '#e8f6ee' : '#e7eefc',
+              statusBg: t.tripStatus === 'completed' ? '#e8f6ee' : '#eef3fd',
               statusFg: t.tripStatus === 'completed' ? '#1e5e3c' : '#2E6BE6',
               price: money(t.price),
               expVal,
@@ -851,7 +851,7 @@ class Component extends DCLogic {
         const sel = r.id === s.activeReqId;
         const acc = s.accepted[r.id];
         const st = acc ? (
-            r.tripStatus === 'confirmed' ? { status: 'CONFIRMED', statusBg: '#e7eefc', statusFg: '#2E6BE6' }
+            r.tripStatus === 'confirmed' ? { status: 'CONFIRMED', statusBg: '#eef3fd', statusFg: '#2E6BE6' }
           : r.tripStatus === 'completed' ? { status: 'COMPLETED', statusBg: '#e8f6ee', statusFg: '#1e5e3c' }
           : r.tripStatus === 'cancelled' ? { status: 'CANCELLED', statusBg: '#fdecec', statusFg: '#b3261e' }
           : { status: 'ACCEPTED', statusBg: '#e8f6ee', statusFg: '#1e5e3c' })
@@ -859,11 +859,11 @@ class Component extends DCLogic {
               ? { status: 'REFUNDED', statusBg: '#eef2f8', statusFg: '#68758d' }
               : { status: 'CLOSED', statusBg: '#eef2f8', statusFg: '#68758d' })
           : r.status === 'collecting' ? { status: 'COLLECTING', statusBg: '#fdf6e3', statusFg: '#8a6d1f' }
-          : { status: r.quotes.length + ' QUOTES', statusBg: '#e7eefc', statusFg: '#2E6BE6' };
+          : { status: r.quotes.length + ' QUOTES', statusBg: '#eef3fd', statusFg: '#2E6BE6' };
         return {
           route: this.routeStr(r), ...st,
           sub: this.fmtDate(r.legs[0].date) + ' · ' + r.pax + ' pax · posted ' + r.posted,
-          bg: sel ? '#eef3fb' : '#fff', bd: sel ? '#2E6BE6' : '#e3e9f2',
+          bg: sel ? '#eef3fd' : '#fff', bd: sel ? '#2E6BE6' : '#e3e9f2',
           onSelect: () => this.setState({ activeReqId: r.id, compare: [], chatWith: null })
         };
       }),
@@ -940,7 +940,7 @@ class Component extends DCLogic {
           rating: q.rating, reviews: q.reviews, resp: q.resp, valid: q.valid,
           price: this.fmtPrice(q.price), emptyLeg: q.emptyLeg, discount: q.discount || '', note: q.note || false,
           bd: isAcc ? '#38a169' : inCmp ? '#2E6BE6' : '#e3e9f2',
-          cmpBd: inCmp ? '#2E6BE6' : '#dde5f0', cmpBg: inCmp ? '#e7eefc' : '#fff', cmpFg: inCmp ? '#2E6BE6' : '#16233b',
+          cmpBd: inCmp ? '#2E6BE6' : '#dde5f0', cmpBg: inCmp ? '#eef3fd' : '#fff', cmpFg: inCmp ? '#2E6BE6' : '#16233b',
           cmpLabel: inCmp ? '✓ Comparing' : 'Compare',
           msgLabel: q.unread ? 'Message (' + q.unread + ' new)' : 'Message',
           onCompare: () => this.setState({ compare: inCmp ? s.compare.filter(x => x !== q.id) : [...s.compare, q.id].slice(-3) }),
@@ -1007,11 +1007,11 @@ class Component extends DCLogic {
         return {
           route: this.routeStr(r),
           status: bid ? 'QUOTE SENT' : r.posted.includes('min') ? 'NEW' : 'OPEN',
-          statusBg: bid ? '#e8f6ee' : r.posted.includes('min') ? '#e7eefc' : '#eef2f8',
+          statusBg: bid ? '#e8f6ee' : r.posted.includes('min') ? '#eef3fd' : '#eef2f8',
           statusFg: bid ? '#1e5e3c' : r.posted.includes('min') ? '#2E6BE6' : '#68758d',
           sub: this.fmtDate(r.legs[0].date) + ' · ' + r.pax + ' pax · ' + r.cats.map(catLabel).join(', ') + ' · ' + r.budget,
           posted: 'Posted ' + r.posted, bids: (r.bids ?? (r.quotes ? r.quotes.length : 0)),
-          bg: sel ? '#eef3fb' : '#fff', bd: sel ? '#2E6BE6' : '#e3e9f2',
+          bg: sel ? '#eef3fd' : '#fff', bd: sel ? '#2E6BE6' : '#e3e9f2',
           onSelect: () => this.setState({ opSelId: r.id })
         };
       }),
@@ -1029,9 +1029,9 @@ class Component extends DCLogic {
           route: this.routeStr(c), client: c.client,
           preview: c.lastMsg || ('Your quote: ' + this.fmtPrice(c.price) + ' — no messages yet'),
           badge,
-          badgeBg: c.unread ? '#2E6BE6' : c.tripStatus === 'cancelled' ? '#fdecec' : c.won ? '#e8f6ee' : '#e7eefc',
+          badgeBg: c.unread ? '#2E6BE6' : c.tripStatus === 'cancelled' ? '#fdecec' : c.won ? '#e8f6ee' : '#eef3fd',
           badgeFg: c.unread ? '#ffffff' : c.tripStatus === 'cancelled' ? '#b3261e' : c.won ? '#1e5e3c' : '#2E6BE6',
-          bg: sel ? '#eef3fb' : '#fff', bd: sel ? '#2E6BE6' : '#e3e9f2',
+          bg: sel ? '#eef3fd' : '#fff', bd: sel ? '#2E6BE6' : '#e3e9f2',
           onOpen: () => {
             this.setState({ chatWith: c.quoteId, ctMsg: '', chats: s.chats[c.quoteId] ? s.chats : { ...s.chats, [c.quoteId]: [] } });
             this.loadChat(c.quoteId);

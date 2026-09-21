@@ -1047,6 +1047,28 @@ if (!newTemplate.includes('{{ checkoutOpen }}')) {
   console.log('applied checkout-modal markup patch');
 }
 
+// Brand type: Quicksand for display text (headings, buttons, anything set
+// bold); Albert Sans stays for running text and inputs. The framework
+// re-serializes inline styles at runtime, hence the spaced "font-weight: 800".
+// :root lifts specificity above the design's own `button{font-family}` rule;
+// inline font-family (the monospace route codes) still wins. List cards are
+// <button>s wrapping divs: those keep Albert Sans for their running text.
+const BRAND_TYPE = `<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--display:'Quicksand','Albert Sans',system-ui,sans-serif}
+:root h1,:root h2,:root h3,:root button,:root [style*="font-weight: 800"],:root [style*="font-weight: 700"]{font-family:var(--display)}
+:root button:has(div){font-family:'Albert Sans',system-ui,sans-serif}
+</style>
+`;
+if (!newTemplate.includes('family=Quicksand')) {
+  newTemplate = newTemplate.replace(MANIFEST_LINK, () => BRAND_TYPE + MANIFEST_LINK);
+  console.log('applied brand display-type markup patch');
+}
+
+// Brand tint: the design's two near-identical blue washes become the one
+// documented in brand/README.md. Runs last so earlier anchors still match.
+for (const wash of ['#e7eefc', '#E7EEFC', '#eef3fb', '#EEF3FB']) newTemplate = newTemplate.split(wash).join('#eef3fd');
+
 // Match the bundler's escaping: "</" must not appear raw inside a script tag.
 const newJson = JSON.stringify(newTemplate).replace(/<\//g, '<\\/');
 
@@ -1180,6 +1202,24 @@ function patchMapZoomPos(doc) {
   return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
 }
 
+// Brand type inside the map page. It is a separate document, so it loads the
+// fonts itself (the app's embedded Albert Sans does not reach into the iframe).
+function patchMapBrandType(doc) {
+  const mOpen = '<script type="__bundler/template">';
+  const ms = doc.indexOf(mOpen);
+  if (ms === -1) return { doc, changed: false };
+  const mStart = ms + mOpen.length;
+  const mEnd = doc.indexOf('</script>', mStart);
+  let tpl = JSON.parse(doc.slice(mStart, mEnd));
+  if (tpl.includes('family=Quicksand') || !tpl.includes('</head>')) return { doc, changed: false };
+  tpl = tpl.replace('</head>', () =>
+    '<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">\n'
+    + "<style>body,#legend,.leaflet-container{font-family:'Albert Sans',system-ui,sans-serif}\n"
+    + ".ap-cluster div,#legend .lg-title{font-family:'Quicksand','Albert Sans',system-ui,sans-serif}</style>\n</head>");
+  const tjson = JSON.stringify(tpl).replace(/<\//g, '<\\/');
+  return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
+}
+
 // Zoom-scaled marker cap: 25 circles at world view, 5x (125) when zoomed in.
 function patchMapZoomCap(doc) {
   const mOpen = '<script type="__bundler/template">';
@@ -1302,8 +1342,10 @@ function swapAirports(doc) {
       if (legended.changed) console.log('applied airport-category colors + legend');
       const zoomed = patchMapZoomPos(legended.doc);
       if (zoomed.changed) console.log('moved map zoom control to bottom-right');
-      if (res.changed || mapped.changed || styled.changed || scaled.changed || legended.changed || zoomed.changed) {
-        entry.data = zlib.gzipSync(Buffer.from(zoomed.doc, 'utf8')).toString('base64');
+      const typed = patchMapBrandType(zoomed.doc);
+      if (typed.changed) console.log('applied brand type to nested map page');
+      if (res.changed || mapped.changed || styled.changed || scaled.changed || legended.changed || zoomed.changed || typed.changed) {
+        entry.data = zlib.gzipSync(Buffer.from(typed.doc, 'utf8')).toString('base64');
         entry.compressed = true;
         changed = true;
       }
