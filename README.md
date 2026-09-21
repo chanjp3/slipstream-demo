@@ -4,7 +4,7 @@
 > D1 databases, the `SLIPSTREAM_KV` binding, the `slipstream_session` cookie and the
 > `slip-*` CSS classes keep the old name so deployments, sessions and patch guards keep working.
 
-**This is the interactive demo deployment** of [Chartavia](https://github.com/chanjp3/slipstream): identical code, plus a persona switcher. Open the app and use the DEMO · VIEW AS bar at the bottom to jump between two clients and three operator seats (admin, team member, competitor) — no logins needed. Post a request as Ava, switch to Meridian to quote it, switch back to accept. Personas are seeded by scripts/seed-demo.js (password demopass123 if you want the login flow); real registrations work but cannot be impersonated.
+**This is the interactive demo deployment** of [Chartavia](https://github.com/chanjp3/slipstream): identical code, plus a persona switcher. Open the app and use the DEMO · VIEW AS bar at the bottom to jump between two clients, three verified operator seats (admin, team member, competitor), a new operator who has not passed the FAA check yet (Northline: the bid desk shows what is missing instead of the quote form), and the concierge staff desk — no logins needed. Post a request as Ava, switch to Meridian to quote it, switch back to accept. Personas are seeded by scripts/seed-demo.js (password demopass123 if you want the login flow); real registrations work but cannot be impersonated.
 
 ---
 
@@ -129,15 +129,20 @@ and removes it from the marketplace. Operators have a MESSAGES inbox in the
 bid-desk sidebar (one conversation per quote sent, WON badge on winning bids)
 that opens the shared chat drawer. Known gaps, in rough priority order:
 
-- Operator profiles verify against the **FAA aircraft registry** live: each
-  fleet tail number is checked (exists, registration valid, model matches the
-  operator's claim via a marketing-name → type-designator alias map), the Part
-  135 certificate number is kept on file (holding one distinguishes an operator
-  from a broker), and the D085 OpSpec (aircraft listing) is uploaded for the
-  record. All checks green + D085 on file → "FAA-checked fleet" badge on the
-  operator's quotes; verified fleet becomes the bid form's aircraft dropdown.
-  The certificate number itself is format-checked only (no public FAA API for
-  live 135 certificate lookup) — pair with manual D085 review before trusting.
+- **FAA verification gates quoting.** The certificate number is matched
+  against the FAA's published Part 135 holders list (`faa135_operators`), each
+  fleet tail is checked live against the FAA aircraft registry (exists,
+  registration valid, model matches the operator's claim via a marketing-name →
+  type-designator alias map) and cross-referenced to that certificate
+  (`faa135_aircraft`). An operator cannot submit a quote or post an empty leg
+  until the certificate matches and the aircraft offered is both registry-matched
+  and on the certificate; the bid desk shows what is missing instead of the
+  quote form. The D085 OpSpec is uploaded for the record and lifts the badge to
+  "FAA 135 verified". The FAA data proves the certificate and aircraft are real
+  and belong together, not that the account holder works for that operator —
+  pair with a manual D085 review before trusting. Refresh the dataset with
+  `scripts/build-faa135.js`; an aircraft added to a certificate after the last
+  refresh reads as "not on certificate" until then.
 - Ratings/reviews/response-time on quotes are still placeholders.
 - No email notifications, forgot-password reset flow, or rate limiting
   (password *change* exists in the account menu; *reset* needs email).

@@ -1204,6 +1204,51 @@ if (!newTemplate.includes('{{ openConciergeTrip }}')) {
   console.log('applied concierge + staff desk markup patch');
 }
 
+// FAA verification gate: operators who have not passed the FAA check see what
+// is missing where the quote form would be, and the operator profile carries
+// the same two checks. The server enforces the rule; this only explains it.
+const GATE_STEP = (size, font, gap, top, labelSize, hintSize) => `<div style="display:flex;gap:${gap}px;align-items:flex-start;margin-top:${top}px">
+                <span style="flex:none;width:${size}px;height:${size}px;box-sizing:border-box;border-radius:50%;border:1.5px solid {{ g.bd }};background:{{ g.bg }};color:{{ g.fg }};display:flex;align-items:center;justify-content:center;font-size:${font}px;font-weight:800">{{ g.mark }}</span>
+                <span style="min-width:0;display:block"><span style="display:block;font-size:${labelSize}px;font-weight:700;color:#16233b">{{ g.label }}</span><span style="display:block;font-size:${hintSize}px;color:#68758d;line-height:1.5;margin-top:2px">{{ g.hint }}</span></span>
+              </div>`;
+const GATE_CARD = `<sc-if value="{{ bidGate }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:24px;background:#fff;border:1.5px solid #e3e9f2;border-top:2px solid #c6a667;border-radius:16px;padding:22px">
+            <div style="font-size:10.5px;font-weight:800;letter-spacing:1.4px;color:#8a6b2e">FAA VERIFICATION REQUIRED</div>
+            <div style="font-size:16px;font-weight:800;color:#16233b;margin-top:6px">Quoting opens once you pass the FAA check</div>
+            <div style="font-size:13px;color:#4a5a76;line-height:1.6;margin-top:6px">Travelers on Chartavia only receive offers from verified Part 135 operators. You can review every request now; sealed quotes unlock when both checks pass.</div>
+            <sc-for list="{{ gateSteps }}" as="g" hint-placeholder-count="2">
+              ${GATE_STEP(22, 11, 11, 14, 13, 12)}
+            </sc-for>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px">
+              <button sc-camel-on-click="{{ openProfile }}" style="border:none;cursor:pointer;background:#16233b;color:#fff;font-size:13.5px;font-weight:800;border-radius:10px;padding:11px 22px" style-hover="filter:brightness(1.15)">{{ gateCta }}</button>
+              <button sc-camel-on-click="{{ openConciergeOp }}" style="border:1.5px solid #e6dcc3;cursor:pointer;background:#fff;color:#8a6b2e;border-radius:10px;padding:10px 16px;font-size:12.5px;font-weight:700">Ask the partner desk</button>
+            </div>
+            <sc-if value="{{ gateMember }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:12px;color:#68758d;margin-top:10px">Only your team admin can edit the certificate and fleet.</div>
+            </sc-if>
+          </div>
+        </sc-if>
+        `;
+const GATE_PROFILE = `
+    <div style="margin-top:12px;border:1.5px solid {{ gateBd }};background:{{ gateBg }};border-radius:12px;padding:12px 14px">
+      <div style="font-size:12.5px;font-weight:800;color:{{ gateFg }}">{{ gateHeadline }}</div>
+      <div style="font-size:11.5px;color:#4a5a76;line-height:1.5;margin-top:2px">{{ gateSub }}</div>
+      <sc-for list="{{ gateSteps }}" as="g" hint-placeholder-count="2">
+        ${GATE_STEP(18, 9.5, 9, 9, 12, 11)}
+      </sc-for>
+    </div>`;
+if (!newTemplate.includes('{{ bidGate }}')) {
+  const GATE_EDITS = [
+    ['<sc-if value="{{ bidFormVisible }}"', GATE_CARD + '<sc-if value="{{ bidFormVisible }}"'],
+    ['letter-spacing:.5px">{{ profBadge }}</div>', 'letter-spacing:.5px">{{ profBadge }}</div>' + GATE_PROFILE],
+  ];
+  for (const [from, to] of GATE_EDITS) {
+    if (newTemplate.split(from).length !== 2) throw new Error('FAA gate anchor not found exactly once: ' + from.slice(0, 70));
+    newTemplate = newTemplate.replace(from, () => to);
+  }
+  console.log('applied FAA verification gate markup patch');
+}
+
 // Brand type: Quicksand for display text (headings, buttons, anything set
 // bold); Albert Sans stays for running text and inputs. The framework
 // re-serializes inline styles at runtime, hence the spaced "font-weight: 800".

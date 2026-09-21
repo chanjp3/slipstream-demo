@@ -1,9 +1,10 @@
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (1, 'ava@demo.chartavia', 'Ava Sinclair', 'client', '029428d2fbe1d3e80703701047053c95', '550951f5d07e10a477ead062d1e949e4645977281d9f3d2b9e0f6d70591c7d4a', 'free', NULL, NULL);
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (2, 'ben@demo.chartavia', 'Ben Okafor', 'client', 'bf7100a11a335e763a4a4e5ab56bedf5', '4561aa3213ed7742eb45941c7c956e270b1608331adce4e2282ea586ea83bde6', 'plus', NULL, NULL);
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (3, 'meridian@demo.chartavia', 'Meridian Charter Ops', 'operator', '11fa38beda916c62e8d241207a957bec', '2d7a6308bc50f806e07801c1a03a065d463b9d4bea392445225ee168f3e13c24', 'pro', 3, 'admin');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (4, 'dana@demo.chartavia', 'Dana Reyes', 'operator', 'a43a861f9e2ca6dbd4f792baddb97e11', '8ea4c72b02f101bd61b9597b66acb32f02abaa0273dddbf59677d2cc08a052c5', 'free', 3, 'member');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (5, 'bluewing@demo.chartavia', 'Bluewing Charters', 'operator', '5aeeacf8e433a5fa17d2d028de4ddf80', '5e3dc9ab9b403d8faa7e0adaca9375180fb7ab2059ed74edfdd5068dd8ce1e05', 'free', 5, 'admin');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (10, 'staff@demo.chartavia', 'Chartavia Concierge', 'client', '453ac34103323dd43dad2d837221b047', '3fdf3504089d9df3fd45f9990b6ce91691c8e87b93941fcb2c5b78dca9bfe281', 'free', NULL, NULL);
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (1, 'ava@demo.chartavia', 'Ava Sinclair', 'client', '1d0a5c4f132e7b927dc45df6a589f9e0', '53e5d8570badc6c6fab48b899b1d7617f532c68fedbf143474aa8187fbe96f42', 'free', NULL, NULL);
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (2, 'ben@demo.chartavia', 'Ben Okafor', 'client', '1abea4a16805a7be9bd54ff7e41988e0', '29bb53751ef152ee472bd8ee19a5d2a3eb8f3ef1f1baa6d5a5eaa2cad99cfac0', 'plus', NULL, NULL);
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (3, 'meridian@demo.chartavia', 'Meridian Charter Ops', 'operator', '6f82f7481c7f34f0ccd9396c6be41fac', '9a06fcbf4da94bd7158e77d65933004a9753cae2eb52a90680da7f3baac2d4b8', 'pro', 3, 'admin');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (4, 'dana@demo.chartavia', 'Dana Reyes', 'operator', '28db953bdbbb1c415b90a3a77f6a6008', '3efef561a486c7ff62616b92a411b5e329c63109443d6651c1c30dcc8d1686b6', 'free', 3, 'member');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (5, 'bluewing@demo.chartavia', 'Bluewing Charters', 'operator', 'fd027bea82ff6855bee11cfa97cf319e', 'd4f9fffa699f7a8db4b98286c4d858bb6a1d1e2198fa8f3a18ce6d66d78f017e', 'free', 5, 'admin');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (11, 'northline@demo.chartavia', 'Northline Air Charter', 'operator', '617cdc852220d68c880d1bff0aa0e30d', 'b946c1482a58867deda9b5a1c97096ec845a65bdab6d3e6833340394e39d00f7', 'free', 11, 'admin');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (10, 'staff@demo.chartavia', 'Chartavia Concierge', 'client', '8ec5f8bf08fd4daf20d5c4e361b20db1', '560c8e64e0df4335ea11ecef75a0d045287b890f6906028024e96413218c14a0', 'free', NULL, NULL);
 INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (6, 'mkt-priya@demo.chartavia', 'Priya Nair', 'client', 'x', 'x', 'free');
 INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (7, 'mkt-luc@demo.chartavia', 'Luc Moreau', 'client', 'x', 'x', 'free');
 INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (8, 'mkt-omar@demo.chartavia', 'Omar Haddad', 'client', 'x', 'x', 'free');
@@ -12,18 +13,29 @@ UPDATE users SET is_staff = 1 WHERE id = 10;
 INSERT INTO concierge_requests (user_id, name, email, topic, request_id, message, status, created_at) SELECT 1, 'Ava Sinclair', 'ava@demo.chartavia', 'trip', 'RQ-2601', 'We are six adults plus two dogs, Teterboro to Aspen on the 21st. Is a super-mid enough for the bags and ski gear, or should I ask for a heavy?', 'new', datetime('now', '-2 hours') WHERE NOT EXISTS (SELECT 1 FROM concierge_requests);
 INSERT INTO concierge_requests (user_id, name, email, phone, topic, message, status, note, created_at) SELECT 5, 'Bluewing Charters', 'bluewing@demo.chartavia', '561 555 0142', 'operator', 'Our D085 was reissued last week with two new tails. What is the fastest way to get them verified so we can quote with them?', 'open', 'Asked them to upload the new D085; re-run the FAA check after.', datetime('now', '-1 day') WHERE (SELECT COUNT(*) FROM concierge_requests) = 1;
 
--- Meridian: fully verified operator org (badge: FAA-checked fleet)
-INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, base_iata, safety_program, d085_name, d085_at, checked_at, updated_at)
-VALUES (3, 'Meridian Jet Group', 'MJGA085K', 'TEB', 'ARGUS Platinum', 'meridian-d085.pdf', datetime('now'), datetime('now'), datetime('now'));
-INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, checked_at)
-VALUES (1, 3, 'N502QS', 'Citation Latitude', 'TEXTRON AVIATION INC', '680A', 'Valid', 'verified', datetime('now')),
-       (2, 3, 'N510JK', 'Citation Mustang', 'CESSNA', '510', 'Valid', 'verified', datetime('now'));
+-- Demo certificates in the FAA tables: quoting requires the certificate to be
+-- on the Part 135 list and each offered aircraft to be on that certificate.
+INSERT OR IGNORE INTO faa135_operators (dsgn, name) VALUES
+  ('MJGA085K', 'Meridian Jet Group'), ('BLWA221K', 'Bluewing Charters'), ('NRLA417K', 'Northline Air Charter');
+INSERT OR IGNORE INTO faa135_aircraft (dsgn, tail, mms) VALUES
+  ('MJGA085K', 'N502QS', NULL), ('MJGA085K', 'N510JK', NULL), ('BLWA221K', 'N1KE', NULL);
+
+-- Meridian: fully verified operator org (badge: FAA 135 verified)
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, d085_name, d085_at, checked_at, updated_at)
+VALUES (3, 'Meridian Jet Group', 'MJGA085K', 'Meridian Jet Group', 'TEB', 'ARGUS Platinum', 'meridian-d085.pdf', datetime('now'), datetime('now'), datetime('now'));
+INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, on_cert, checked_at)
+VALUES (1, 3, 'N502QS', 'Citation Latitude', 'TEXTRON AVIATION INC', '680A', 'Valid', 'verified', 1, datetime('now')),
+       (2, 3, 'N510JK', 'Citation Mustang', 'CESSNA', '510', 'Valid', 'verified', 1, datetime('now'));
 
 -- Bluewing: cert + fleet verified, D085 still pending
-INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, base_iata, safety_program, checked_at, updated_at)
-VALUES (5, 'Bluewing Charters', 'BLWA221K', 'PBI', 'Wyvern Wingman', datetime('now'), datetime('now'));
-INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, checked_at)
-VALUES (3, 5, 'N1KE', 'Gulfstream G650', 'GULFSTREAM AEROSPACE CORP', 'GVI', 'Valid', 'verified', datetime('now'));
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, checked_at, updated_at)
+VALUES (5, 'Bluewing Charters', 'BLWA221K', 'Bluewing Charters', 'PBI', 'Wyvern Wingman', datetime('now'), datetime('now'));
+INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, on_cert, checked_at)
+VALUES (3, 5, 'N1KE', 'Gulfstream G650', 'GULFSTREAM AEROSPACE CORP', 'GVI', 'Valid', 'verified', 1, datetime('now'));
+
+-- Northline: certificate matched, no aircraft yet, so quoting is still locked
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, updated_at)
+VALUES (11, 'Northline Air Charter', 'NRLA417K', 'Northline Air Charter', 'BED', datetime('now'));
 
 -- Ava's completed + reviewed trip (gives Meridian a real rating & response time)
 INSERT OR IGNORE INTO requests (id, user_id, type, legs, pax, flex_days, cats, budget, needs, addons, notes, accepted_quote_id, trip_status, deposit_amount, deposit_status, created_at)

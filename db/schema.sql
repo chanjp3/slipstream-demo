@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS quotes (
   message TEXT NOT NULL DEFAULT '',
   empty_leg INTEGER NOT NULL DEFAULT 0,
   valid_hours INTEGER NOT NULL DEFAULT 48,
+  expenses INTEGER,                -- operator-entered trip costs (analytics profit margin)
   contract_type TEXT,              -- 'file' (stored in KV) | 'link' (e.g. DocuSign)
   contract_name TEXT,
   contract_url TEXT,
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS operator_profiles (
   user_id INTEGER PRIMARY KEY REFERENCES users(id),
   company TEXT NOT NULL DEFAULT '',
   cert_number TEXT NOT NULL DEFAULT '',   -- FAA air carrier certificate number
+  cert_faa_name TEXT,                     -- holder name when cert_number is on the FAA Part 135 list; NULL = unmatched
   base_iata TEXT NOT NULL DEFAULT '',
   safety_program TEXT,                    -- ARGUS/Wyvern/IS-BAO rating (self-declared)
   cert_doc_name TEXT,                     -- uploaded air carrier certificate (KV cert:<org>)
@@ -88,8 +90,16 @@ CREATE TABLE IF NOT EXISTS fleet_aircraft (
   faa_status TEXT NOT NULL DEFAULT 'pending',  -- pending | verified | found | mismatch | not_found
   checked_at TEXT,
   photo_at TEXT,                          -- aircraft photo uploaded (bytes in KV acphoto:<id>)
+  on_cert INTEGER,                        -- 1/0: tail is / is not on the org's certificate in the FAA list; NULL = no verified certificate
   UNIQUE(operator_id, tail)
 );
+
+-- FAA Part 135 certificate holders and the aircraft on each certificate.
+-- Filled by db/faa135.sql (scripts/build-faa135.js rebuilds it from the FAA's
+-- published list). Operators can only quote once their certificate is in
+-- faa135_operators and the aircraft offered is in faa135_aircraft under it.
+CREATE TABLE IF NOT EXISTS faa135_operators (dsgn TEXT PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS faa135_aircraft (dsgn TEXT NOT NULL, tail TEXT NOT NULL, mms TEXT, PRIMARY KEY (dsgn, tail));
 
 -- Empty-leg board: repositioning flights operators list at a discount.
 CREATE TABLE IF NOT EXISTS empty_legs (
@@ -119,6 +129,20 @@ CREATE TABLE IF NOT EXISTS reviews (
   stars INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
   text TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Email notifications: sent via Resend when RESEND_API_KEY is set; otherwise
+-- recorded here (demo mode). email_notif throttles per-conversation pings.
+CREATE TABLE IF NOT EXISTS email_outbox (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  to_email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  html TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS email_notif (
+  k TEXT PRIMARY KEY,
+  at TEXT NOT NULL
 );
 
 -- Concierge: messages from the public /concierge page (user_id null) or the

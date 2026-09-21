@@ -11,12 +11,6 @@ class Component extends DCLogic {
     this.BUDGETS = ['Under $15k', '$15–30k', '$30–60k', '$60k+', 'Flexible'];
     this.NEEDS = ['Pet on board', 'Medical equipment', 'Extra baggage', 'Wheelchair access'];
     this.ADDONS = ['Catering', 'Ground transport', 'Wi-Fi required'];
-    this.FLEET = [
-      { id: 'p300', label: 'Phenom 300E — Light, 7 seats' },
-      { id: 'xls', label: 'Citation XLS Gen2 — Midsize, 9 seats' },
-      { id: 'c350', label: 'Challenger 350 — Super-mid, 9 seats' },
-      { id: 'g450', label: 'Gulfstream G450 — Heavy, 14 seats' }
-    ];
     this.me = null;
     this.state = {
       role: (props.defaultRole === 'operator') ? 'operator' : 'client',
@@ -34,7 +28,7 @@ class Component extends DCLogic {
       compare: [], accepted: {}, chatWith: null, chatText: '',
       chats: {},
       opSelId: null, opBids: {}, inbox: [],
-      bidAircraft: 'xls', bidPrice: '', bidMsg: '', bidEmpty: false, bidValid: '48',
+      bidAircraft: '', bidPrice: '', bidMsg: '', bidEmpty: false, bidValid: '48',
       menuOpen: false, profileName: '', pwCurrent: '', pwNew: '', acctMsg: '', showEL: true,
       ctLink: '', ctMsg: '', checkoutOpen: false, apSearch: '',
       profileOpen: false, prCompany: '', prCert: '', prBase: '', prTail: '', prModel: '', prMsg: '',
@@ -42,7 +36,7 @@ class Component extends DCLogic {
       rvFor: null, rvStars: 0, rvText: '', rvMsg: '',
       emptyLegs: [], myLegs: [],
       legFormOpen: false, legFrom: '', legTo: '', legDate: '', legTime: '09:00',
-      legAircraft: 'xls', legPrice: '', legNote: '', legMsg: '',
+      legAircraft: '', legPrice: '', legNote: '', legMsg: '',
       depOpen: false, depAmount: 0,
       apOpen: false, mapOpen: false,
       opView: 'desk', expEdits: {}, expMsg: '',
@@ -123,6 +117,38 @@ class Component extends DCLogic {
     }));
   }
 
+  // Aircraft this operator may offer: matched to the FAA registry and listed on
+  // the verified certificate. Empty until the operator passes the FAA check.
+  quotable() {
+    const p = this.opProfile;
+    if (!p || !p.clearance || !p.clearance.ok) return [];
+    return p.fleet.filter(a => p.clearance.cleared.includes(a.tail));
+  }
+  // The two checks behind the quoting gate, with what is still missing.
+  gateSteps() {
+    const p = this.opProfile;
+    const c = (p && p.clearance) || { ok: false, certOk: false, cleared: [], reason: 'cert_missing' };
+    const prof = (p && p.profile) || {};
+    const fleet = p ? p.fleet : [];
+    const certHint = c.certOk ? 'Matched to ' + prof.cert_faa_name + ' (' + prof.cert_number + ')'
+      : prof.cert_number ? prof.cert_number + ' is not on the FAA Part 135 holders list. Check the designator.'
+      : 'Add your certificate number to the operator profile and save.';
+    const matched = fleet.filter(a => a.faa_status === 'verified');
+    const acHint = c.cleared.length ? c.cleared.length + ' of ' + fleet.length + ' cleared to offer: ' + c.cleared.join(', ')
+      : !fleet.length ? 'Add the aircraft you operate, then run the FAA check.'
+      : fleet.every(a => !a.faa_status || a.faa_status === 'pending') ? 'Run the FAA check on your fleet.'
+      : matched.length && !c.certOk ? 'Your aircraft match the registry. They are checked against your certificate once it is verified.'
+      : matched.length ? 'Your aircraft match the registry but are not on certificate ' + prof.cert_number + ' in the FAA list. If your D085 changed recently, message the partner desk.'
+      : 'No aircraft has passed yet. See the note beside each tail number.';
+    const look = (done, n) => done
+      ? { mark: '✓', bg: '#e8f6ee', fg: '#1e5e3c', bd: '#9fd8b6' }
+      : { mark: String(n), bg: '#ffffff', fg: '#68758d', bd: '#cfd8e6' };
+    return [
+      { label: 'Part 135 certificate matched to the FAA list', hint: certHint, ...look(c.certOk, 1) },
+      { label: 'An aircraft matched to the FAA registry and your certificate', hint: acHint, ...look(c.cleared.length > 0, 2) }
+    ];
+  }
+
   loadData() {
     return this.api('/api/bootstrap').then(d => {
       this.me = d.me;
@@ -155,9 +181,9 @@ class Component extends DCLogic {
           marketplace: d.marketplace, opBids, inbox: d.inbox || [], myLegs: d.myEmptyLegs || [],
           opSelId: keep ? this.state.opSelId : (d.marketplace[0] ? d.marketplace[0].id : null)
         };
-        const fleet = this.opProfile ? this.opProfile.fleet : [];
-        if (fleet.length && !fleet.some(a => 'tail:' + a.tail === this.state.bidAircraft)) {
-          patch.bidAircraft = 'tail:' + fleet[0].tail;
+        const cleared = this.quotable();
+        if (!cleared.some(a => 'tail:' + a.tail === this.state.bidAircraft)) {
+          patch.bidAircraft = cleared.length ? 'tail:' + cleared[0].tail : '';
         }
         if (!this.state.profileOpen && this.opProfile && this.opProfile.profile) {
           const p = this.opProfile.profile;
@@ -297,7 +323,10 @@ class Component extends DCLogic {
     } }).then(() => {
       this.setState({ legFormOpen: false, legFrom: '', legTo: '', legDate: '', legPrice: '', legNote: '', legMsg: '' });
       this.loadData();
-    }).catch(e => this.setState({ legMsg: e.message })).then(() => { this._legging = false; });
+    }).catch(e => {
+      if (e.code === 'verify') { this.setState({ legFormOpen: false, profileOpen: true, prMsg: e.message }); this.loadData(); }
+      else this.setState({ legMsg: e.message });
+    }).then(() => { this._legging = false; });
   }
   removeEmptyLeg(id) {
     this.api('/api/empty-legs/' + id + '/remove', { body: {} })
@@ -343,6 +372,7 @@ class Component extends DCLogic {
       this.loadData();
     }).catch(e => {
       if (e.code === 'upgrade') this.setState({ checkoutOpen: true, menuOpen: false });
+      else if (e.code === 'verify') { this.setState({ profileOpen: true, prMsg: e.message }); this.loadData(); }
       else alert(e.message);
     }).then(() => { this._bidding = false; });
   }
@@ -617,6 +647,8 @@ class Component extends DCLogic {
     const rfq = s.marketplace.find(r => r.id === s.opSelId) || s.marketplace[0];
     const rfqBid = rfq ? s.opBids[rfq.id] : null;
     const inboxChat = s.role === 'operator' ? s.inbox.find(c => c.quoteId === s.chatWith) : null;
+    const gateOk = !!(this.opProfile && this.opProfile.clearance && this.opProfile.clearance.ok);
+    const opIsAdmin = !!(this.opProfile && this.opProfile.team && this.opProfile.team.myOrgRole === 'admin');
 
     // The signed-in account's role is authoritative: the header toggle only
     // "switches" to the role you actually are (the other side is a no-op).
@@ -651,16 +683,17 @@ class Component extends DCLogic {
       closeProfile: () => this.setState({ profileOpen: false }),
       profileOpen: s.profileOpen,
       profBadge: this.opProfile ? this.opProfile.badge : 'Unverified',
-      profBadgeBg: this.opProfile && this.opProfile.badge === 'FAA-checked fleet' ? '#e8f6ee'
+      profBadgeBg: this.opProfile && this.opProfile.badge.startsWith('FAA 135 verified') ? '#e8f6ee'
         : this.opProfile && this.opProfile.badge !== 'Unverified' ? '#eef3fd' : '#eef2f8',
-      profBadgeFg: this.opProfile && this.opProfile.badge === 'FAA-checked fleet' ? '#1e5e3c'
+      profBadgeFg: this.opProfile && this.opProfile.badge.startsWith('FAA 135 verified') ? '#1e5e3c'
         : this.opProfile && this.opProfile.badge !== 'Unverified' ? '#2E6BE6' : '#68758d',
       prCompany: s.prCompany, onPrCompany: e => this.setState({ prCompany: e.target.value }),
       prCert: s.prCert, onPrCert: e => this.setState({ prCert: e.target.value }),
       prBase: s.prBase, onPrBase: e => this.setState({ prBase: e.target.value }),
       saveOpProfile: () => this.saveOpProfile(),
       prFleet: (this.opProfile ? this.opProfile.fleet : []).map(a => {
-        const st = a.faa_status === 'verified' ? { label: 'FAA MATCH', bg: '#e8f6ee', fg: '#1e5e3c' }
+        const st = a.faa_status === 'verified' && a.on_cert === 0 ? { label: 'NOT ON CERTIFICATE', bg: '#fdecec', fg: '#b3261e' }
+          : a.faa_status === 'verified' ? { label: 'FAA MATCH', bg: '#e8f6ee', fg: '#1e5e3c' }
           : a.faa_status === 'found' ? { label: 'ON REGISTRY', bg: '#eef3fd', fg: '#2E6BE6' }
           : a.faa_status === 'mismatch' ? { label: 'MODEL MISMATCH', bg: '#fdecec', fg: '#b3261e' }
           : a.faa_status === 'not_found' ? { label: 'NOT FOUND', bg: '#fdecec', fg: '#b3261e' }
@@ -842,9 +875,13 @@ class Component extends DCLogic {
       })),
       hasMyLegs: s.myLegs.length > 0,
       openLegForm: () => {
-        const fleetOpts = (this.opProfile && this.opProfile.fleet.length)
-          ? 'tail:' + this.opProfile.fleet[0].tail : 'xls';
-        this.setState({ legFormOpen: true, legMsg: '', legAircraft: fleetOpts, menuOpen: false });
+        const cleared = this.quotable();
+        if (!cleared.length) {
+          this.setState({ profileOpen: true, menuOpen: false,
+            prMsg: 'Empty legs can be posted once your certificate and an aircraft pass the FAA check.' });
+          return;
+        }
+        this.setState({ legFormOpen: true, legMsg: '', legAircraft: 'tail:' + cleared[0].tail, menuOpen: false });
       },
       closeLegForm: () => this.setState({ legFormOpen: false }),
       legFormOpen: s.legFormOpen,
@@ -1174,13 +1211,18 @@ class Component extends DCLogic {
       })) : [],
       rfqChips: rfq ? reqChips(rfq) : [],
       rfqNotes: rfq && rfq.notes ? rfq.notes : false,
-      bidSent: !!rfqBid, bidFormVisible: !rfqBid,
-      fleet: (this.opProfile && this.opProfile.fleet.length)
-        ? this.opProfile.fleet.map(a => ({
-            id: 'tail:' + a.tail,
-            label: a.model_claim + ' — ' + a.tail + (a.faa_status === 'verified' ? ' ✓ FAA' : '')
-          }))
-        : this.FLEET,
+      bidSent: !!rfqBid, bidFormVisible: !rfqBid && gateOk,
+      // FAA verification gate
+      bidGate: !rfqBid && !gateOk,
+      gateSteps: this.gateSteps(),
+      gateCta: opIsAdmin ? 'Complete verification' : 'View operator profile',
+      gateMember: !opIsAdmin,
+      gateHeadline: gateOk ? 'Cleared to quote' : 'Quoting is locked',
+      gateSub: gateOk
+        ? 'You can send sealed quotes and post empty legs with your cleared aircraft.'
+        : 'Sealed quotes and empty legs open once both checks below pass.',
+      gateBg: gateOk ? '#f1faf5' : '#fbf8f0', gateBd: gateOk ? '#9fd8b6' : '#e6dcc3', gateFg: gateOk ? '#1e5e3c' : '#8a6b2e',
+      fleet: this.quotable().map(a => ({ id: 'tail:' + a.tail, label: a.model_claim + ' — ' + a.tail })),
       bidAircraft: s.bidAircraft, onBidAircraft: e => this.setState({ bidAircraft: e.target.value }),
       bidPrice: s.bidPrice, onBidPrice: e => this.setState({ bidPrice: e.target.value }),
       bidMsg: s.bidMsg, onBidMsg: e => this.setState({ bidMsg: e.target.value }),

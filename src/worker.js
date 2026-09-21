@@ -14,6 +14,7 @@ const DEMO_PERSONAS = [
   { email: 'meridian@demo.chartavia', label: 'Meridian · Op Admin' },
   { email: 'dana@demo.chartavia', label: 'Dana · Op Member' },
   { email: 'bluewing@demo.chartavia', label: 'Bluewing · Operator' },
+  { email: 'northline@demo.chartavia', label: 'Northline · New operator' },
   { email: 'staff@demo.chartavia', label: 'Concierge · Staff' },
 ];
 
@@ -751,7 +752,45 @@ async function getOperatorProfile(env, userId) {
     fleet_n: fleet.length,
     fleet_ok: fleet.filter((f) => f.faa_status === 'verified').length,
   } : null);
-  return { profile: profile || null, fleet, badge };
+  return { profile: profile || null, fleet, badge, clearance: quoteClearance(profile, fleet) };
+}
+
+// Sealed quotes and empty legs are reserved for operators who pass the FAA
+// check: the certificate number matches the FAA's Part 135 holders list, and the
+// aircraft offered matches the FAA registry and is listed on that certificate.
+function quoteClearance(profile, fleet) {
+  const certOk = !!(profile && profile.cert_number && profile.cert_faa_name);
+  const cleared = certOk
+    ? fleet.filter((a) => a.faa_status === 'verified' && a.on_cert === 1).map((a) => a.tail)
+    : [];
+  let reason = null;
+  if (!certOk) reason = profile && profile.cert_number ? 'cert_unmatched' : 'cert_missing';
+  else if (!fleet.length) reason = 'no_fleet';
+  else if (!cleared.length) reason = 'no_cleared_aircraft';
+  return { ok: !reason, certOk, cleared, reason };
+}
+
+const CLEARANCE_MSG = {
+  cert_missing: 'Quoting opens once your Part 135 certificate is verified. Add the certificate number in the operator profile.',
+  cert_unmatched: 'Your certificate number is not on the FAA Part 135 holders list. Check the designator in the operator profile.',
+  no_fleet: 'Add the aircraft you operate in the operator profile and run the FAA check to start quoting.',
+  no_cleared_aircraft: 'None of your aircraft has passed the FAA check yet. An aircraft must match the FAA registry and be listed on your certificate.',
+};
+
+// The aircraft for a quote or an empty leg, or the refusal to send back.
+async function clearedAircraft(env, me, choice) {
+  const { fleet, badge, clearance } = await getOperatorProfile(env, me.orgId);
+  if (!clearance.ok) return { error: json({ error: CLEARANCE_MSG[clearance.reason], code: 'verify' }, 403) };
+  const tail = String(choice || '').startsWith('tail:') ? String(choice).slice(5).toUpperCase() : '';
+  const ac = fleet.find((a) => a.tail === tail);
+  if (!ac) return { error: json({ error: 'Choose an aircraft from your verified fleet' }, 400) };
+  if (!clearance.cleared.includes(ac.tail)) {
+    return { error: json({
+      error: ac.tail + ' has not passed the FAA check, so it cannot be offered yet. Choose a verified aircraft or re-run the check in the operator profile.',
+      code: 'verify',
+    }, 403) };
+  }
+  return { aircraft: ac.tail + '|' + ac.model_claim, badge };
 }
 
 function certLooksValid(cert) {
@@ -793,6 +832,14 @@ async function apiSaveOperatorProfile(request, env, me) {
      ON CONFLICT (user_id) DO UPDATE SET company = ?2, cert_number = ?3, base_iata = ?4,
        safety_program = ?5, cert_faa_name = ?6, updated_at = datetime('now')`
   ).bind(me.orgId, company, cert, base, safety, faa ? faa.name : null).run();
+  // Which aircraft are "on the certificate" depends on the number just saved.
+  await env.DB.prepare(
+    `UPDATE fleet_aircraft SET on_cert = CASE
+       WHEN ?1 = '' THEN NULL
+       WHEN EXISTS (SELECT 1 FROM faa135_aircraft x WHERE x.dsgn = ?1 AND x.tail = fleet_aircraft.tail) THEN 1
+       ELSE 0 END
+     WHERE operator_id = ?2`
+  ).bind(faa ? cert : '', me.orgId).run();
   return json({ ok: true, certOk: certLooksValid(cert), faaName: faa ? faa.name : null });
 }
 
@@ -904,8 +951,8 @@ async function apiVerifyFleet(env, me) {
   ).bind(me.orgId).all()).results;
   if (!fleet.length) return json({ error: 'Add aircraft to your fleet first' }, 400);
 
-  const prof = await env.DB.prepare('SELECT cert_number FROM operator_profiles WHERE user_id = ?').bind(me.orgId).first();
-  const cert = prof?.cert_number || '';
+  const prof = await env.DB.prepare('SELECT cert_number, cert_faa_name FROM operator_profiles WHERE user_id = ?').bind(me.orgId).first();
+  const cert = prof?.cert_faa_name ? prof.cert_number : '';
   const results = [];
   for (const a of fleet) {
     const r = await faaLookup(a.tail);
@@ -1097,10 +1144,12 @@ async function apiPublicStats(env) {
   const orgs = (await env.DB.prepare(
     `SELECT p.cert_number, p.cert_faa_name, p.d085_name, p.safety_program, p.cert_doc_name,
             (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id) AS fleet_n,
-            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id AND f.faa_status = 'verified') AS fleet_ok
+            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id AND f.faa_status = 'verified') AS fleet_ok,
+            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id AND f.faa_status = 'verified' AND f.on_cert = 1) AS fleet_cleared
      FROM operator_profiles p`
   ).all()).results;
-  const verified = orgs.filter((o) => verificationBadge(o).startsWith('FAA 135'));
+  // Same bar as quoting: certificate on the FAA list and at least one cleared aircraft.
+  const verified = orgs.filter((o) => o.cert_number && o.cert_faa_name && o.fleet_cleared > 0);
   if (verified.length >= min) out.verifiedOperators = verified.length;
   // Ratings are operator-declared; only count ones backed by an uploaded certificate.
   out.ratings = [...new Set(verified.filter((o) => o.safety_program && o.cert_doc_name).map((o) => o.safety_program))];
@@ -1642,6 +1691,9 @@ async function apiSubmitQuote(request, env, me, requestId) {
   if (me.role !== 'operator') return json({ error: 'Only operators can submit quotes' }, 403);
   const b = await request.json().catch(() => null);
   if (!b) return json({ error: 'Invalid request body' }, 400);
+  const pick = await clearedAircraft(env, me, b.aircraft);
+  if (pick.error) return pick.error;
+  const aircraft = pick.aircraft;
 
   const req = await env.DB.prepare('SELECT * FROM requests WHERE id = ?').bind(requestId).first();
   if (!req) return json({ error: 'Request not found' }, 404);
@@ -1655,17 +1707,6 @@ async function apiSubmitQuote(request, env, me, requestId) {
   ).bind(requestId, me.orgId).first();
   if (teamBid) return json({ error: 'Your team already submitted a quote for this request' }, 409);
 
-  let aircraft;
-  if (String(b.aircraft || '').startsWith('tail:')) {
-    const tail = String(b.aircraft).slice(5).toUpperCase();
-    const ac = await env.DB.prepare(
-      'SELECT tail, model_claim FROM fleet_aircraft WHERE operator_id = ? AND tail = ?'
-    ).bind(me.orgId, tail).first();
-    if (!ac) return json({ error: 'That aircraft is not in your fleet' }, 400);
-    aircraft = ac.tail + '|' + ac.model_claim;
-  } else {
-    aircraft = FLEET[b.aircraft] ? b.aircraft : 'xls';
-  }
   const price = Math.round(+b.price);
   if (!Number.isFinite(price) || price <= 0 || price > 5_000_000) {
     return json({ error: 'Enter a valid price' }, 400);
@@ -1685,15 +1726,14 @@ async function apiSubmitQuote(request, env, me, requestId) {
   }
   {
     const route = routeOfLegs(req.type, JSON.parse(req.legs || '[]'));
-    const badge = (await getOperatorProfile(env, me.orgId)).badge;
     await notifyUser(env, req.user_id, 'New sealed offer on ' + requestId,
       ['An operator has answered your request with a sealed offer. Their identity stays private until you accept.',
        'Compare it side by side with your other offers, message the operator, and accept when you are ready.'],
       new URL(request.url).origin + '/app', 'View your offers',
       { kicker: 'NEW OFFER', title: 'A new offer for ' + route, rows: [
         ['Trip', requestId], ['Route', route],
-        ['Aircraft', aircraft.includes('|') ? aircraft.split('|')[1] : FLEET[aircraft].name],
-        ['Offer', '$' + price.toLocaleString('en-US')], ['FAA check', badge], ['Valid for', validHours + ' hours'],
+        ['Aircraft', aircraft.split('|')[1]],
+        ['Offer', '$' + price.toLocaleString('en-US')], ['FAA check', pick.badge], ['Valid for', validHours + ' hours'],
       ] });
   }
   return json({ ok: true, price });
@@ -1821,6 +1861,9 @@ async function apiPostEmptyLeg(request, env, me) {
   if (me.role !== 'operator') return json({ error: 'Operators only' }, 403);
   const b = await request.json().catch(() => null);
   if (!b) return json({ error: 'Invalid request body' }, 400);
+  const pick = await clearedAircraft(env, me, b.aircraft);
+  if (pick.error) return pick.error;
+  const aircraft = pick.aircraft;
 
   const from = String(b.from || '').trim().toUpperCase().slice(0, 4);
   const to = String(b.to || '').trim().toUpperCase().slice(0, 4);
@@ -1832,19 +1875,6 @@ async function apiPostEmptyLeg(request, env, me) {
   const time = String(b.time || '').slice(0, 5);
   const price = Math.round(+b.price);
   if (!Number.isFinite(price) || price <= 0 || price > 5_000_000) return json({ error: 'Enter a valid price' }, 400);
-
-  let aircraft, seats = null;
-  if (String(b.aircraft || '').startsWith('tail:')) {
-    const tail = String(b.aircraft).slice(5).toUpperCase();
-    const ac = await env.DB.prepare(
-      'SELECT tail, model_claim FROM fleet_aircraft WHERE operator_id = ? AND tail = ?'
-    ).bind(me.orgId, tail).first();
-    if (!ac) return json({ error: 'That aircraft is not in your fleet' }, 400);
-    aircraft = ac.tail + '|' + ac.model_claim;
-  } else {
-    aircraft = FLEET[b.aircraft] ? b.aircraft : 'xls';
-    seats = FLEET[aircraft].seats;
-  }
 
   const open = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM empty_legs WHERE operator_org = ? AND status = 'open'"
@@ -1858,7 +1888,7 @@ async function apiPostEmptyLeg(request, env, me) {
   await env.DB.prepare(
     `INSERT INTO empty_legs (operator_org, created_by, from_code, to_code, date, time, aircraft, seats, price, note)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(me.orgId, me.id, from, to, date, time, aircraft, seats, price, String(b.note || '').slice(0, 300)).run();
+  ).bind(me.orgId, me.id, from, to, date, time, aircraft, null, price, String(b.note || '').slice(0, 300)).run();
   return json({ ok: true });
 }
 

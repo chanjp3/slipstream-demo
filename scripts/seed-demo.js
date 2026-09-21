@@ -1,7 +1,10 @@
 // Generates db/seed-demo.sql: switchable demo personas (password: demopass123),
 // a fully verified operator org with fleet, marketplace requests, quotes,
 // chat, a completed+reviewed trip, and an empty leg — so the demo opens with
-// every feature visible.
+// every feature visible. Northline is the counter-example: a new operator who
+// has not passed the FAA check, so the quoting gate can be seen.
+// For a fresh database only (messages and empty legs would duplicate on a re-run).
+// Load db/schema.sql and db/faa135.sql first.
 // Usage: node scripts/seed-demo.js && npx wrangler d1 execute slipstream-demo-db --remote --file db/seed-demo.sql -y
 const fs = require('fs');
 const path = require('path');
@@ -25,6 +28,7 @@ async function hash(password, saltHex) {
     [3, 'meridian@demo.chartavia', 'Meridian Charter Ops', 'operator', 'pro', 3, "admin"],
     [4, 'dana@demo.chartavia', 'Dana Reyes', 'operator', 'free', 3, "member"],
     [5, 'bluewing@demo.chartavia', 'Bluewing Charters', 'operator', 'free', 5, "admin"],
+    [11, 'northline@demo.chartavia', 'Northline Air Charter', 'operator', 'free', 11, "admin"],
     [10, 'staff@demo.chartavia', 'Chartavia Concierge', 'client', 'free', null, null],
   ];
   const marketClients = [
@@ -50,18 +54,29 @@ INSERT INTO concierge_requests (user_id, name, email, topic, request_id, message
 INSERT INTO concierge_requests (user_id, name, email, phone, topic, message, status, note, created_at) SELECT 5, 'Bluewing Charters', 'bluewing@demo.chartavia', '561 555 0142', 'operator', 'Our D085 was reissued last week with two new tails. What is the fastest way to get them verified so we can quote with them?', 'open', 'Asked them to upload the new D085; re-run the FAA check after.', datetime('now', '-1 day') WHERE (SELECT COUNT(*) FROM concierge_requests) = 1;`);
 
   lines.push(`
--- Meridian: fully verified operator org (badge: FAA-checked fleet)
-INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, base_iata, safety_program, d085_name, d085_at, checked_at, updated_at)
-VALUES (3, 'Meridian Jet Group', 'MJGA085K', 'TEB', 'ARGUS Platinum', 'meridian-d085.pdf', datetime('now'), datetime('now'), datetime('now'));
-INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, checked_at)
-VALUES (1, 3, 'N502QS', 'Citation Latitude', 'TEXTRON AVIATION INC', '680A', 'Valid', 'verified', datetime('now')),
-       (2, 3, 'N510JK', 'Citation Mustang', 'CESSNA', '510', 'Valid', 'verified', datetime('now'));
+-- Demo certificates in the FAA tables: quoting requires the certificate to be
+-- on the Part 135 list and each offered aircraft to be on that certificate.
+INSERT OR IGNORE INTO faa135_operators (dsgn, name) VALUES
+  ('MJGA085K', 'Meridian Jet Group'), ('BLWA221K', 'Bluewing Charters'), ('NRLA417K', 'Northline Air Charter');
+INSERT OR IGNORE INTO faa135_aircraft (dsgn, tail, mms) VALUES
+  ('MJGA085K', 'N502QS', NULL), ('MJGA085K', 'N510JK', NULL), ('BLWA221K', 'N1KE', NULL);
+
+-- Meridian: fully verified operator org (badge: FAA 135 verified)
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, d085_name, d085_at, checked_at, updated_at)
+VALUES (3, 'Meridian Jet Group', 'MJGA085K', 'Meridian Jet Group', 'TEB', 'ARGUS Platinum', 'meridian-d085.pdf', datetime('now'), datetime('now'), datetime('now'));
+INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, on_cert, checked_at)
+VALUES (1, 3, 'N502QS', 'Citation Latitude', 'TEXTRON AVIATION INC', '680A', 'Valid', 'verified', 1, datetime('now')),
+       (2, 3, 'N510JK', 'Citation Mustang', 'CESSNA', '510', 'Valid', 'verified', 1, datetime('now'));
 
 -- Bluewing: cert + fleet verified, D085 still pending
-INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, base_iata, safety_program, checked_at, updated_at)
-VALUES (5, 'Bluewing Charters', 'BLWA221K', 'PBI', 'Wyvern Wingman', datetime('now'), datetime('now'));
-INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, checked_at)
-VALUES (3, 5, 'N1KE', 'Gulfstream G650', 'GULFSTREAM AEROSPACE CORP', 'GVI', 'Valid', 'verified', datetime('now'));
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, checked_at, updated_at)
+VALUES (5, 'Bluewing Charters', 'BLWA221K', 'Bluewing Charters', 'PBI', 'Wyvern Wingman', datetime('now'), datetime('now'));
+INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, on_cert, checked_at)
+VALUES (3, 5, 'N1KE', 'Gulfstream G650', 'GULFSTREAM AEROSPACE CORP', 'GVI', 'Valid', 'verified', 1, datetime('now'));
+
+-- Northline: certificate matched, no aircraft yet, so quoting is still locked
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, updated_at)
+VALUES (11, 'Northline Air Charter', 'NRLA417K', 'Northline Air Charter', 'BED', datetime('now'));
 
 -- Ava's completed + reviewed trip (gives Meridian a real rating & response time)
 INSERT OR IGNORE INTO requests (id, user_id, type, legs, pax, flex_days, cats, budget, needs, addons, notes, accepted_quote_id, trip_status, deposit_amount, deposit_status, created_at)
