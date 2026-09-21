@@ -86,6 +86,10 @@ export default {
     }
     return withSecurityHeaders(await handlePage(request, env, path));
   },
+  // Daily (see "triggers" in wrangler.jsonc): rating expiry reminders.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(ratingExpirySweep(env));
+  },
 };
 
 function withSecurityHeaders(res) {
@@ -249,6 +253,7 @@ async function handleApi(request, env, path) {
     if (path === '/api/operator/certificate' && method === 'GET') return await apiGetCertDoc(env, me);
     if (path === '/api/operator/safety-doc' && method === 'POST') return await apiUploadSafetyDoc(request, env, me);
     if (path === '/api/operator/safety-doc' && method === 'GET') return await apiGetSafetyDoc(env, me);
+    if (path === '/api/operator/review/resubmit' && method === 'POST') return await apiResubmitReview(request, env, me);
     if ((m = path.match(/^\/api\/operator\/fleet\/(\d+)\/photo$/)) && method === 'POST')
       return await apiUploadAircraftPhoto(request, env, me, +m[1]);
     if ((m = path.match(/^\/api\/fleet\/(\d+)\/photo$/)) && method === 'GET')
@@ -262,6 +267,11 @@ async function handleApi(request, env, path) {
       return await apiSetTripExpenses(request, env, me, +m[1]);
     if ((m = path.match(/^\/api\/staff\/concierge\/(\d+)$/)) && method === 'POST')
       return await apiStaffConcierge(request, env, me, +m[1]);
+    if (path === '/api/staff/sweep' && method === 'POST') {
+      // The daily job on demand; it is idempotent, so running it twice sends nothing twice.
+      if (!me.isStaff) return json({ error: 'Not found' }, 404);
+      return json({ ok: true, ...(await ratingExpirySweep(env)) });
+    }
     if ((m = path.match(/^\/api\/staff\/operators\/(\d+)$/)) && method === 'POST')
       return await apiStaffOperator(request, env, me, +m[1]);
     if ((m = path.match(/^\/api\/staff\/operators\/(\d+)\/doc\/(certificate|d085|safety)$/)) && method === 'GET')
@@ -794,11 +804,31 @@ const STAFF_CLEARABLE = ['verified', 'found', 'mismatch'];
 // SQL twins of aircraftCleared() and of "the rating staff confirmed is the one
 // claimed", for queries that scan fleet_aircraft as f and join the profile as p.
 const AC_CLEARED_SQL = "((f.faa_status = 'verified' AND f.on_cert = 1) OR (f.staff_ok = 1 AND f.faa_status IN ('verified', 'found', 'mismatch')))";
-const RATING_SQL = 'CASE WHEN p.safety_verified = p.safety_program THEN p.safety_program END AS safety_program';
+const RATING_SQL = "CASE WHEN p.safety_verified = p.safety_program AND p.safety_expires >= date('now') THEN p.safety_program END AS safety_program";
+
+// The same rule for one profile row, with what staff and the operator need to
+// know around it. A confirmation lasts until the expiry date staff read off the
+// audit certificate (inclusive, UTC); a confirmation with no date shows nothing.
+function ratingState(p) {
+  if (!p || !p.safety_program) return { claimed: null, shown: null };
+  const today = new Date().toISOString().slice(0, 10);
+  const confirmed = p.safety_verified === p.safety_program;
+  const expires = confirmed ? p.safety_expires || null : null;
+  const expired = confirmed && (!expires || expires < today);
+  return {
+    claimed: p.safety_program, hasDoc: !!p.safety_doc_name, confirmed, expires, expired,
+    daysLeft: expires && !expired ? Math.round((Date.parse(expires) - Date.parse(today)) / 86400000) : null,
+    // a certificate uploaded after the confirmation is a renewal waiting for staff
+    newDoc: confirmed && !!p.safety_doc_at && !!p.safety_verified_at && p.safety_doc_at > p.safety_verified_at,
+    shown: confirmed && !expired ? p.safety_program : null,
+  };
+}
+const RATING_REMIND_DAYS = 30;
+const RATING_MAX_YEARS = 5;
 
 const CLEARANCE_MSG = {
   review_pending: 'Your operator account is in review. Quoting opens as soon as the Chartavia team approves it.',
-  review_declined: 'Your operator account has not been approved. Message the partner desk from the bid desk and we will sort it out.',
+  review_declined: 'Your operator account has not been approved yet. The operator profile shows what we need; resubmit for review from there.',
   cert_missing: 'Quoting opens once your Part 135 certificate is verified. Add the certificate number in the operator profile.',
   cert_unmatched: 'Your certificate number is not on the FAA Part 135 holders list. Check the designator in the operator profile.',
   no_fleet: 'Add the aircraft you operate in the operator profile and run the FAA check to start quoting.',
@@ -1228,7 +1258,7 @@ const REVIEW_STAGE_ORDER = { ready: 0, rating: 1, incomplete: 2, declined: 3, ap
 const STAFF_ACTION_LABELS = {
   approve: 'Approved', decline: 'Declined', revoke: 'Approval withdrawn', clear_aircraft: 'Aircraft cleared',
   unclear_aircraft: 'Aircraft clearance removed', confirm_rating: 'Rating confirmed', unconfirm_rating: 'Rating confirmation removed',
-  note: 'Note saved', reset: 'Review reset',
+  note: 'Note saved', reset: 'Review reset', resubmit: 'Resubmitted for review',
 };
 
 // Every operator company with what staff need to decide: who holds the account,
@@ -1251,9 +1281,8 @@ async function operatorReviewDesk(env) {
     const profile = o.user_id ? o : null;
     const fleet = fleetRows.filter((f) => f.operator_id === o.org_id);
     const clearance = quoteClearance(profile, fleet);
-    const claimed = (profile && profile.safety_program) || null;
-    const ratingConfirmed = !!claimed && profile.safety_verified === claimed;
-    const ratingWaiting = !!claimed && !ratingConfirmed && !!profile.safety_doc_name;
+    const rating = ratingState(profile);
+    const ratingWaiting = !!rating.claimed && rating.hasDoc && (!rating.confirmed || rating.newDoc);
     const stage = clearance.review === 'approved' ? (ratingWaiting ? 'rating' : 'approved')
       : clearance.review === 'declined' ? 'declined'
       : clearance.autoOk ? 'ready' : (ratingWaiting ? 'rating' : 'incomplete');
@@ -1276,15 +1305,16 @@ async function operatorReviewDesk(env) {
         ['d085', 'D085 aircraft listing', profile && profile.d085_name],
         ['safety', 'Safety audit certificate', profile && profile.safety_doc_name],
       ].filter((d) => d[2]).map((d) => ({ kind: d[0], label: d[1], name: d[2] })),
-      rating: { claimed, hasDoc: !!(profile && profile.safety_doc_name), confirmed: ratingConfirmed },
+      rating: { ...rating, waiting: ratingWaiting },
       note: (profile && profile.review_note) || '',
+      reason: (profile && profile.review_reason) || '', message: (profile && profile.review_message) || '',
       last: last ? (STAFF_ACTION_LABELS[last.action] || last.action) + (last.detail ? ' (' + last.detail + ')' : '') + ' by ' + (last.actor || 'staff') + ' · ' + timeAgo(last.created_at) : null,
     };
   }).sort((a, b) => REVIEW_STAGE_ORDER[a.stage] - REVIEW_STAGE_ORDER[b.stage]);
 
   return {
     readyCount: items.filter((i) => i.stage === 'ready').length,
-    ratingCount: items.filter((i) => i.rating.claimed && i.rating.hasDoc && !i.rating.confirmed).length,
+    ratingCount: items.filter((i) => i.rating.waiting).length,
     items,
   };
 }
@@ -1300,17 +1330,23 @@ async function apiStaffOperator(request, env, me, orgId) {
   const p = op.profile;
   const company = p.company || org.name;
   const origin = new URL(request.url).origin;
-  const mail = (subject, title, lines, rows) => notifyUser(env, orgId, subject, lines, origin + '/app', 'Open Chartavia',
-    { kicker: 'OPERATOR REVIEW', title, rows: [['Operator', company], ...(rows || [])] });
+  const mail = (subject, title, lines, rows, quote) => notifyUser(env, orgId, subject, lines, origin + '/app', 'Open Chartavia',
+    { kicker: 'OPERATOR REVIEW', title, quote, rows: [['Operator', company], ...(rows || [])] });
   let detail = null;
 
   if (b.action === 'approve' || b.action === 'decline') {
     if (b.action === 'approve' && !op.clearance.certOk) {
       return json({ error: 'Approve once the certificate number matches the FAA list. The approval is recorded against that certificate.' }, 400);
     }
+    // A decline tells the operator what is missing: that is what they resubmit against.
+    const why = b.action === 'decline' ? String(b.reason || '').trim().slice(0, 600) : null;
+    if (b.action === 'decline' && why.length < 10) {
+      return json({ error: 'Tell the operator what is missing. They see this text and can resubmit once it is in place.' }, 400);
+    }
     await env.DB.prepare(
-      `UPDATE operator_profiles SET review_status = ?, review_cert = cert_number, reviewed_at = datetime('now'), reviewed_by = ? WHERE user_id = ?`
-    ).bind(b.action === 'approve' ? 'approved' : 'declined', me.id, orgId).run();
+      `UPDATE operator_profiles SET review_status = ?1, review_cert = cert_number, reviewed_at = datetime('now'), reviewed_by = ?2,
+         review_reason = ?3, review_message = CASE WHEN ?1 = 'approved' THEN NULL ELSE review_message END WHERE user_id = ?4`
+    ).bind(b.action === 'approve' ? 'approved' : 'declined', me.id, why, orgId).run();
     detail = p.cert_number || null;
     if (b.action === 'approve') {
       await mail('Your operator account is approved', 'You are approved to quote', [
@@ -1321,9 +1357,9 @@ async function apiStaffOperator(request, env, me, orgId) {
       ], [['Certificate', p.cert_number]]);
     } else {
       await mail('About your operator account', 'We need a little more from you', [
-        'We could not yet confirm that this account belongs to the holder of certificate ' + (p.cert_number || 'on file') + ', so quoting stays locked for now.',
-        'Message the partner desk from the bid desk and we will sort it out with you.',
-      ]);
+        'We could not yet confirm your operator account for certificate ' + (p.cert_number || 'on file') + ', so quoting stays locked for now. This is what we need:',
+        'Once it is in place, open your operator profile and choose "Resubmit for review". Questions? Message the partner desk from the bid desk.',
+      ], null, why);
     }
   } else if (b.action === 'revoke') {
     await env.DB.prepare(
@@ -1357,14 +1393,29 @@ async function apiStaffOperator(request, env, me, orgId) {
     if (b.action === 'confirm_rating') {
       if (!p.safety_program) return json({ error: 'This operator has not declared a rating' }, 400);
       if (!p.safety_doc_name) return json({ error: 'Confirm a rating only against an uploaded audit certificate' }, 400);
-      await env.DB.prepare("UPDATE operator_profiles SET safety_verified = safety_program, safety_verified_at = datetime('now') WHERE user_id = ?").bind(orgId).run();
+      const expires = String(b.expires || '');
+      const today = new Date().toISOString().slice(0, 10);
+      const latest = new Date(Date.now() + RATING_MAX_YEARS * 366 * 86400000).toISOString().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(expires) || Number.isNaN(Date.parse(expires))) {
+        return json({ error: 'Enter the expiry date shown on the audit certificate' }, 400);
+      }
+      if (expires < today) return json({ error: 'That audit certificate has already expired' }, 400);
+      if (expires > latest) return json({ error: 'An expiry more than ' + RATING_MAX_YEARS + ' years out is not plausible. Check the date.' }, 400);
+      await env.DB.prepare(
+        `UPDATE operator_profiles SET safety_verified = safety_program, safety_verified_at = datetime('now'),
+           safety_expires = ?, safety_reminded = NULL WHERE user_id = ?`
+      ).bind(expires, orgId).run();
       await mail('Your ' + p.safety_program + ' rating is confirmed', 'Your safety rating is confirmed', [
-        'We checked your audit certificate. ' + p.safety_program + ' now appears on your quotes and empty legs.',
-      ], [['Rating', p.safety_program]]);
+        'We checked your audit certificate. ' + p.safety_program + ' now appears on your quotes and empty legs until ' + fmtLegDate(expires) + '.',
+        'Upload the renewed certificate before then and we will confirm it again, so the rating never drops off your quotes.',
+      ], [['Rating', p.safety_program], ['Valid until', fmtLegDate(expires)]]);
+      detail = p.safety_program + ' until ' + expires;
     } else {
-      await env.DB.prepare('UPDATE operator_profiles SET safety_verified = NULL, safety_verified_at = NULL WHERE user_id = ?').bind(orgId).run();
+      await env.DB.prepare(
+        'UPDATE operator_profiles SET safety_verified = NULL, safety_verified_at = NULL, safety_expires = NULL, safety_reminded = NULL WHERE user_id = ?'
+      ).bind(orgId).run();
+      detail = p.safety_program || null;
     }
-    detail = p.safety_program || null;
   } else if (b.action !== 'note') {
     return json({ error: 'Unknown action' }, 400);
   }
@@ -1374,6 +1425,68 @@ async function apiStaffOperator(request, env, me, orgId) {
   }
   await logStaffAction(env, me.id, orgId, b.action, detail);
   return json({ ok: true, review: await operatorReviewDesk(env) });
+}
+
+// A declined operator puts themselves back in the queue once what staff asked
+// for is in place. One resubmission per decline: it ends the declined state.
+async function apiResubmitReview(request, env, me) {
+  const err = requireOrgAdmin(me);
+  if (err) return err;
+  const limited = await rateLimit(request, env, 'resubmit', me.orgId);
+  if (limited) return limited;
+  const b = await request.json().catch(() => null);
+  if (!b) return json({ error: 'Invalid request body' }, 400);
+  const message = String(b.message || '').trim().slice(0, 1000);
+  if (message.length < 10) return json({ error: 'Tell us in a sentence what has changed since the review' }, 400);
+  const op = await getOperatorProfile(env, me.orgId);
+  if (!op.profile || op.clearance.review !== 'declined') return json({ error: 'There is no declined review to resubmit' }, 409);
+  await env.DB.prepare(
+    `UPDATE operator_profiles SET review_status = NULL, review_cert = NULL, review_message = ?,
+       review_requested_at = datetime('now') WHERE user_id = ?`
+  ).bind(message, me.orgId).run();
+  await logStaffAction(env, me.id, me.orgId, 'resubmit', message.slice(0, 140));
+  if (env.CONCIERGE_EMAIL) {
+    await sendEmail(env, env.CONCIERGE_EMAIL, 'Operator resubmitted for review: ' + (op.profile.company || op.profile.cert_faa_name || 'operator'), emailHtml(
+      'An operator resubmitted for review',
+      ['They were declined earlier and say the following has changed. Review them again on the staff desk.'],
+      'Open the staff desk', new URL(request.url).origin + '/app',
+      { kicker: 'STAFF', quote: message, rows: [['Operator', op.profile.company], ['Certificate', op.profile.cert_number], ['You asked for', op.profile.review_reason]] }
+    ));
+  }
+  return json({ ok: true });
+}
+
+// Tells operators when a confirmed rating is about to lapse and when it has.
+// The marker holds the milestone and the date it was sent for, so each email
+// goes out once and a re-confirmation with a new date starts over.
+async function ratingExpirySweep(env) {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = (await env.DB.prepare(
+    `SELECT user_id, company, safety_program, safety_expires, safety_reminded FROM operator_profiles
+     WHERE safety_program IS NOT NULL AND safety_verified = safety_program AND safety_expires IS NOT NULL
+       AND safety_expires <= date('now', '+${RATING_REMIND_DAYS} days')`
+  ).all()).results;
+  const origin = env.APP_ORIGIN || '';
+  let soon = 0, expired = 0;
+  for (const r of rows) {
+    const lapsed = r.safety_expires < today;
+    const mark = (lapsed ? 'expired:' : 'soon:') + r.safety_expires;
+    if (r.safety_reminded === mark || (!lapsed && r.safety_reminded === 'expired:' + r.safety_expires)) continue;
+    const when = fmtLegDate(r.safety_expires);
+    await notifyUser(env, r.user_id,
+      lapsed ? 'Your ' + r.safety_program + ' rating is no longer shown' : 'Your ' + r.safety_program + ' rating expires on ' + when,
+      lapsed
+        ? ['The audit certificate behind your ' + r.safety_program + ' rating expired on ' + when + ', so the rating no longer appears on your quotes and empty legs.',
+           'Upload the renewed certificate in your operator profile and we will confirm it again.']
+        : ['The audit certificate behind your ' + r.safety_program + ' rating expires on ' + when + '. After that date the rating stops appearing on your quotes and empty legs.',
+           'Upload the renewed certificate in your operator profile and we will confirm it, so there is no gap.'],
+      origin ? origin + '/app' : null, 'Open your operator profile',
+      { kicker: 'SAFETY RATING', title: lapsed ? 'Your safety rating has expired' : 'Your safety rating expires soon',
+        rows: [['Operator', r.company], ['Rating', r.safety_program], [lapsed ? 'Expired' : 'Valid until', when]] });
+    await env.DB.prepare('UPDATE operator_profiles SET safety_reminded = ? WHERE user_id = ?').bind(mark, r.user_id).run();
+    if (lapsed) expired++; else soon++;
+  }
+  return { checked: rows.length, remindedSoon: soon, remindedExpired: expired };
 }
 
 async function apiStaffOperatorDoc(env, me, orgId, kind) {
@@ -1506,7 +1619,7 @@ async function tripDocPage(request, env, session, requestId) {
     + '<section class="grid"><div><div class="k">Aircraft and operator</div>' + kv([
       ['Operator', company], ['Aircraft', acName], ['Registration', acTail], ['Seats', acSeats && String(acSeats)],
       ['Part 135 certificate', cert], ['FAA check', op.badge],
-      ['Safety rating (audit certificate confirmed)', op.profile && op.profile.safety_program && op.profile.safety_verified === op.profile.safety_program ? op.profile.safety_program : null],
+      ['Safety rating (audit certificate confirmed)', ratingState(op.profile).shown],
     ]) + '</div><div><div class="k">Travel party</div>' + kv([
       ['Traveler', req.client_name], ['Passengers', String(req.pax)],
       ['Requested cabin', list(req.cats).map((c) => CAT_LABELS[c] || c).join(', ')],

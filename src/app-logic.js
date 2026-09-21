@@ -41,7 +41,8 @@ class Component extends DCLogic {
       apOpen: false, mapOpen: false,
       opView: 'desk', expEdits: {}, expMsg: '',
       conOpen: false, conTopic: 'trip', conReqId: null, conMsg: '', conPhone: '', conBusy: false, conDone: '', conErr: '',
-      staffOpen: false, staffTab: 'messages', opNotes: {}, staffMsg: ''
+      staffOpen: false, staffTab: 'messages', opNotes: {}, opReasons: {}, opExpiry: {}, staffMsg: '',
+      rsMsg: '', rsErr: '', rsBusy: false
     };
     this.opStats = null;
     this.DEPOSIT_TIERS = { prop: 150, light: 150, mid: 250, smid: 250, heavy: 500, ulr: 500 };
@@ -50,6 +51,21 @@ class Component extends DCLogic {
   ap(code) { return this.airports ? this.airports.find(a => a.iata === code) : null; }
   fmtDate(d) { const dt = new Date(d + 'T12:00'); return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
   fmtPrice(p) { return '$' + p.toLocaleString('en-US'); }
+  // 'YYYY-MM-DD' as a full date; expiry dates are compared and shown in UTC.
+  fmtDay(d) { return new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }); }
+  // Where a declared safety rating stands: mirrors ratingState() in the worker.
+  ratingState(pr) {
+    if (!pr || !pr.safety_program) return { claimed: null };
+    const today = new Date().toISOString().slice(0, 10);
+    const confirmed = pr.safety_verified === pr.safety_program;
+    const expires = confirmed ? pr.safety_expires || null : null;
+    const expired = confirmed && (!expires || expires < today);
+    return {
+      claimed: pr.safety_program, hasDoc: !!pr.safety_doc_name, confirmed, expires, expired,
+      daysLeft: expires && !expired ? Math.round((Date.parse(expires) - Date.parse(today)) / 86400000) : null,
+      newDoc: confirmed && !!pr.safety_doc_at && !!pr.safety_verified_at && pr.safety_doc_at > pr.safety_verified_at
+    };
+  }
 
   // Cabin class for the quote-card art, from the model name first (operators
   // type free text) and the seat count as a fallback.
@@ -142,7 +158,7 @@ class Component extends DCLogic {
       : 'No aircraft has passed yet. See the note beside each tail number, or message the partner desk.';
     const missingDocs = [!prof.cert_doc_name && 'air carrier certificate', !prof.d085_name && 'D085'].filter(Boolean);
     const reviewHint = c.review === 'approved' ? 'Approved for certificate ' + prof.cert_number + '.'
-      : c.review === 'declined' ? 'We could not yet confirm that this account belongs to the certificate holder. Message the partner desk and we will work through it.'
+      : c.review === 'declined' ? (prof.review_reason ? 'What we need: ' + prof.review_reason : 'We could not yet confirm that this account belongs to the certificate holder.')
       : c.autoOk ? 'In review. A member of our team confirms this account belongs to the certificate holder, and you get an email when it is done.'
         + (missingDocs.length ? ' Uploading your ' + missingDocs.join(' and ') + ' speeds this up.' : '')
       : 'Starts on its own once the two checks above pass.';
@@ -539,6 +555,18 @@ class Component extends DCLogic {
       .then(d => this.setState({ conBusy: false, conDone: d.ref || 'sent' }))
       .catch(e => this.setState({ conBusy: false, conErr: e.message || 'Could not send. Try again.' }));
   }
+  resubmitReview() {
+    const s = this.state;
+    if (s.rsBusy) return;
+    if (s.rsMsg.trim().length < 10) { this.setState({ rsErr: 'Tell us in a sentence what has changed since the review.' }); return; }
+    this.setState({ rsBusy: true, rsErr: '' });
+    this.api('/api/operator/review/resubmit', { body: { message: s.rsMsg } })
+      .then(() => {
+        this.setState({ rsBusy: false, rsMsg: '', prMsg: 'Resubmitted. You will get an email when the review is done.' });
+        this.loadData();
+      })
+      .catch(e => this.setState({ rsBusy: false, rsErr: e.message || 'Could not resubmit. Try again.' }));
+  }
   // Staff decisions on an operator. An edited note rides along with any action.
   staffOp(orgId, action, extra) {
     if (this._staffing) return;
@@ -547,9 +575,11 @@ class Component extends DCLogic {
     this.api('/api/staff/operators/' + orgId, { body: { action, ...(extra || {}), ...(note != null ? { note } : {}) } })
       .then(d => {
         this.review = d.review;
-        const opNotes = { ...this.state.opNotes };
+        const opNotes = { ...this.state.opNotes }, opReasons = { ...this.state.opReasons }, opExpiry = { ...this.state.opExpiry };
         delete opNotes[orgId];
-        this.setState({ opNotes, staffMsg: '' });
+        if (action === 'decline') delete opReasons[orgId];
+        if (action === 'confirm_rating' || action === 'unconfirm_rating') delete opExpiry[orgId];
+        this.setState({ opNotes, opReasons, opExpiry, staffMsg: '' });
       })
       .catch(e => this.setState({ staffMsg: e.message }))
       .then(() => { this._staffing = false; });
@@ -772,13 +802,20 @@ class Component extends DCLogic {
       })),
       ...(() => {
         const pr = (this.opProfile && this.opProfile.profile) || {};
-        const confirmed = !!pr.safety_program && pr.safety_verified === pr.safety_program;
+        const r = this.ratingState(pr);
+        const soon = r.confirmed && !r.expired && r.daysLeft <= 30;
+        const until = r.expires ? this.fmtDay(r.expires) : '';
         return {
-          safetyHint: !pr.safety_program ? 'Pick your current rating, then upload the audit certificate. It appears on your quotes once our team has confirmed it.'
-            : confirmed ? 'Confirmed against your audit certificate. Shown on your quotes and empty legs. Tap again to clear.'
-            : pr.safety_doc_name ? 'Awaiting confirmation by our team. Not shown to travelers yet.'
+          safetyHint: !r.claimed ? 'Pick your current rating, then upload the audit certificate. It appears on your quotes once our team has confirmed it.'
+            : r.confirmed && r.expired ? (r.newDoc
+              ? 'Your renewed audit certificate is with our team. The rating returns to your quotes once it is confirmed.'
+              : (until ? 'Expired on ' + until + ', so the rating' : 'The rating') + ' is hidden from travelers. Upload the renewed audit certificate and our team will confirm it.')
+            : soon ? 'Valid until ' + until + ' (' + r.daysLeft + (r.daysLeft === 1 ? ' day' : ' days') + ' left). '
+              + (r.newDoc ? 'Your renewed certificate is with our team.' : 'Upload the renewed audit certificate now so the rating never drops off your quotes.')
+            : r.confirmed ? 'Confirmed against your audit certificate, valid until ' + until + '. Shown on your quotes and empty legs. Tap again to clear.'
+            : r.hasDoc ? 'Awaiting confirmation by our team. Not shown to travelers yet.'
             : 'Not shown to travelers yet. Upload your audit certificate so our team can confirm it.',
-          safetyHintFg: confirmed ? '#1e5e3c' : pr.safety_program ? '#8a6b2e' : '#8593ab',
+          safetyHintFg: r.confirmed && r.expired ? '#b3261e' : r.confirmed && !soon ? '#1e5e3c' : r.claimed ? '#8a6b2e' : '#8593ab',
           hasSafetyDoc: !!pr.safety_doc_name, safetyDocName: pr.safety_doc_name || '',
           onSafetyDocFile: e => { const f = e.target.files && e.target.files[0]; if (f) { this.uploadSafetyDoc(f); e.target.value = ''; } },
         };
@@ -1136,6 +1173,7 @@ class Component extends DCLogic {
           : state === 'stop' ? { mark: '!', bg: '#fdecec', fg: '#b3261e', bd: '#f3b9b4' }
           : { mark: String(n), bg: '#ffffff', fg: '#68758d', bd: '#cfd8e6' };
         const note = s.opNotes[o.orgId];
+        if (o.message && o.review === 'pending') stage.stLabel = 'RESUBMITTED';
         return {
           ...stage, company: o.company,
           certLine: o.cert ? 'Certificate ' + o.cert + (o.faaName ? ' · FAA list: ' + o.faaName : ' · not on the FAA list') : 'No certificate number entered',
@@ -1167,12 +1205,21 @@ class Component extends DCLogic {
           }),
           noDocs: !o.docs.length,
           docs: o.docs.map(d => ({ label: d.label, name: d.name, href: '/api/staff/operators/' + o.orgId + '/doc/' + d.kind })),
-          ratingLine: o.rating.claimed
-            ? 'Claims ' + o.rating.claimed + (o.rating.confirmed ? ' · confirmed, shown to travelers' : o.rating.hasDoc ? ' · audit certificate on file, not confirmed, hidden from travelers' : ' · no audit certificate uploaded, hidden from travelers')
-            : false,
-          canConfirmRating: !!o.rating.claimed && o.rating.hasDoc && !o.rating.confirmed,
+          ratingLine: !o.rating.claimed ? false : 'Claims ' + o.rating.claimed + (
+            o.rating.confirmed && o.rating.expired
+              ? (o.rating.expires ? ' · expired on ' + this.fmtDay(o.rating.expires) : ' · confirmed without an expiry date') + ', hidden from travelers'
+                + (o.rating.newDoc ? ' · renewed certificate uploaded: confirm it with the new date' : o.rating.expires ? ' · waiting for the renewed certificate' : ': confirm again with the date')
+            : o.rating.confirmed
+              ? ' · confirmed, shown to travelers until ' + this.fmtDay(o.rating.expires) + (o.rating.daysLeft <= 30 ? ' (' + o.rating.daysLeft + ' days left)' : '')
+                + (o.rating.newDoc ? ' · renewed certificate uploaded: confirm it with the new date' : '')
+            : o.rating.hasDoc ? ' · audit certificate on file, not confirmed, hidden from travelers'
+            : ' · no audit certificate uploaded, hidden from travelers'),
+          canConfirmRating: !!o.rating.claimed && o.rating.hasDoc,
+          confirmLabel: o.rating.confirmed ? 'Update expiry' : 'Confirm rating',
+          expiry: s.opExpiry[o.orgId] != null ? s.opExpiry[o.orgId] : (o.rating.expires || ''),
+          onExpiry: e => this.setState({ opExpiry: { ...s.opExpiry, [o.orgId]: e.target.value } }),
           canUnconfirmRating: o.rating.confirmed,
-          onConfirmRating: () => this.staffOp(o.orgId, 'confirm_rating'),
+          onConfirmRating: () => this.staffOp(o.orgId, 'confirm_rating', { expires: s.opExpiry[o.orgId] != null ? s.opExpiry[o.orgId] : (o.rating.expires || '') }),
           onUnconfirmRating: () => this.staffOp(o.orgId, 'unconfirm_rating'),
           note: note != null ? note : o.note,
           onNote: e => this.setState({ opNotes: { ...s.opNotes, [o.orgId]: e.target.value } }),
@@ -1184,7 +1231,11 @@ class Component extends DCLogic {
           canRevoke: o.review !== 'pending',
           revokeLabel: o.review === 'approved' ? 'Withdraw approval' : 'Reopen review',
           onApprove: () => this.staffOp(o.orgId, 'approve'),
-          onDecline: () => this.staffOp(o.orgId, 'decline'),
+          onDecline: () => this.staffOp(o.orgId, 'decline', { reason: s.opReasons[o.orgId] || '' }),
+          reason: s.opReasons[o.orgId] || '',
+          onReason: e => this.setState({ opReasons: { ...s.opReasons, [o.orgId]: e.target.value } }),
+          reasonLine: o.reason && o.review !== 'approved' ? (o.review === 'declined' ? 'Declined. You asked for: ' : 'Declined earlier. You asked for: ') + o.reason : false,
+          messageLine: o.message && o.review === 'pending' ? o.message : false,
           onRevoke: () => this.staffOp(o.orgId, 'revoke'),
           mailHref: 'mailto:' + o.email + '?subject=' + encodeURIComponent('Your Chartavia operator account'),
           last: o.last || false
@@ -1361,15 +1412,21 @@ class Component extends DCLogic {
       gateBody: gateWhy === 'review_pending'
         ? 'Your certificate and aircraft passed the FAA checks. Before your first quote, a member of our team confirms that this account belongs to the certificate holder. You can review every request in the meantime.'
         : gateWhy === 'review_declined'
-        ? 'Quoting stays locked until we can confirm this account belongs to the certificate holder. Message the partner desk and we will work through it with you.'
+        ? 'Quoting stays locked until the point below is resolved. When it is, resubmit for review from your operator profile.'
         : 'Travelers on Chartavia only receive offers from verified Part 135 operators. You can review every request now; sealed quotes unlock when the three checks below are complete.',
-      gateCta: opIsAdmin && gateWhy !== 'review_pending' && gateWhy !== 'review_declined' ? 'Complete verification' : 'View operator profile',
+      gateCta: opIsAdmin && gateWhy === 'review_declined' ? 'Open profile to resubmit'
+        : opIsAdmin && gateWhy !== 'review_pending' ? 'Complete verification' : 'View operator profile',
+      canResubmit: gateWhy === 'review_declined' && opIsAdmin,
+      resubmitMember: gateWhy === 'review_declined' && !opIsAdmin,
+      rsMsg: s.rsMsg, onRsMsg: e => this.setState({ rsMsg: e.target.value, rsErr: '' }),
+      rsErr: s.rsErr || false, rsLabel: s.rsBusy ? 'Sending…' : 'Resubmit for review',
+      resubmitReview: () => this.resubmitReview(),
       gateMember: !opIsAdmin,
       gateHeadline: gateOk ? 'Cleared to quote' : gateWhy === 'review_pending' ? 'In review' : gateWhy === 'review_declined' ? 'Not approved yet' : 'Quoting is locked',
       gateSub: gateOk
         ? 'You can send sealed quotes and post empty legs with your cleared aircraft.'
         : gateWhy === 'review_pending' ? 'The automatic checks passed. Quoting opens when our team approves your account.'
-        : gateWhy === 'review_declined' ? 'Message the partner desk from the bid desk and we will work through it with you.'
+        : gateWhy === 'review_declined' ? 'See what we need under the third check, put it in place, then resubmit below.'
         : 'Sealed quotes and empty legs open once the three checks below pass.',
       gateBg: gateOk ? '#f1faf5' : '#fbf8f0', gateBd: gateOk ? '#9fd8b6' : '#e6dcc3', gateFg: gateOk ? '#1e5e3c' : '#8a6b2e',
       fleet: this.quotable().map(a => ({ id: 'tail:' + a.tail, label: a.model_claim + ' — ' + a.tail })),

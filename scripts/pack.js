@@ -1367,6 +1367,51 @@ if (!newTemplate.includes('{{ staffTabOps }}')) {
   console.log('applied operator review markup patch');
 }
 
+// Rating expiry and resubmission. A declined operator resubmits from the profile's
+// checklist; on the staff card a rating is confirmed together with the expiry
+// date on the audit certificate, and a decline carries the reason the operator
+// will see. Edits the markup the two patches above put in.
+const RESUBMIT_FORM = `
+      <sc-if value="{{ canResubmit }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e6dcc3">
+          <div style="font-size:12px;font-weight:700;color:#16233b">Resubmit for review</div>
+          <div style="font-size:11px;color:#68758d;line-height:1.5;margin-top:2px">When what we asked for is in place, tell us what changed and we will review your account again.</div>
+          <textarea value="{{ rsMsg }}" sc-camel-on-change="{{ onRsMsg }}" rows="2" placeholder="e.g. Uploaded our air carrier certificate and the reissued D085." style="width:100%;box-sizing:border-box;margin-top:8px;border:1.5px solid #dde5f0;border-radius:9px;padding:8px 10px;font-size:12.5px;line-height:1.5;resize:vertical;background:#fff;color:#16233b"></textarea>
+          <sc-if value="{{ rsErr }}" hint-placeholder-val="{{ false }}"><div style="margin-top:6px;font-size:11.5px;font-weight:600;color:#b3261e">{{ rsErr }}</div></sc-if>
+          <button sc-camel-on-click="{{ resubmitReview }}" style="margin-top:8px;border:none;cursor:pointer;background:#16233b;color:#fff;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700">{{ rsLabel }}</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ resubmitMember }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px;font-size:11.5px;color:#68758d">Your team admin can resubmit the account for review from this screen.</div>
+      </sc-if>`;
+const STAFF_CONFIRM_OLD = '<sc-if value="{{ o.canConfirmRating }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ o.onConfirmRating }}" style="' + STAFF_BTN_DARK + ';padding:6px 11px;font-size:11.5px">Confirm rating</button></sc-if>';
+const STAFF_CONFIRM_NEW = '<sc-if value="{{ o.canConfirmRating }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+  + '<span style="font-size:11.5px;color:#68758d">Valid until</span>'
+  + '<input type="date" value="{{ o.expiry }}" sc-camel-on-change="{{ o.onExpiry }}" style="border:1.5px solid #dde5f0;border-radius:8px;padding:5px 8px;font-size:12px;background:#fff;color:#16233b">'
+  + '<button sc-camel-on-click="{{ o.onConfirmRating }}" style="' + STAFF_BTN_DARK + ';padding:6px 11px;font-size:11.5px">{{ o.confirmLabel }}</button></span></sc-if>';
+const STAFF_DECISION_OLD = '<div style="' + STAFF_LABEL + '">DECISION</div>';
+const STAFF_DECISION_NEW = STAFF_DECISION_OLD + `
+          <sc-if value="{{ o.reasonLine }}" hint-placeholder-val="{{ false }}"><div style="margin-bottom:8px;padding:9px 12px;background:#fdf4f3;border-left:3px solid #e3a09a;font-size:12.5px;line-height:1.5;color:#4a5a76">{{ o.reasonLine }}</div></sc-if>
+          <sc-if value="{{ o.messageLine }}" hint-placeholder-val="{{ false }}"><div style="margin-bottom:8px;padding:9px 12px;background:#fbf9f5;border-left:3px solid #c6a667;font-size:12.5px;line-height:1.5;color:#4a5a76;white-space:pre-wrap"><b style="color:#16233b">The operator says:</b> {{ o.messageLine }}</div></sc-if>`;
+const STAFF_REASON = `
+          <sc-if value="{{ o.canDecline }}" hint-placeholder-val="{{ false }}">
+            <textarea value="{{ o.reason }}" sc-camel-on-change="{{ o.onReason }}" rows="2" placeholder="If you decline: what is missing. The operator sees this text and can resubmit once it is in place." style="width:100%;box-sizing:border-box;margin-top:6px;border:1.5px solid #ecd9d7;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.5;resize:vertical;background:#fff;color:#16233b"></textarea>
+          </sc-if>`;
+if (!newTemplate.includes('{{ canResubmit }}')) {
+  const profileSteps = /(\{\{ gateSub \}\}<\/div>[\s\S]*?<\/sc-for>)(\s*<\/div>)/;
+  const staffNote = /(placeholder="Internal note: how you confirmed the account holder\. Never shown to the operator\."[^>]*><\/textarea>)/;
+  if (!profileSteps.test(newTemplate) || !staffNote.test(newTemplate)) throw new Error('expiry/resubmit regex anchors not found — template changed?');
+  for (const from of [STAFF_CONFIRM_OLD, STAFF_DECISION_OLD]) {
+    if (newTemplate.split(from).length !== 2) throw new Error('expiry/resubmit anchor not found exactly once: ' + from.slice(0, 70));
+  }
+  newTemplate = newTemplate
+    .replace(profileSteps, (m, steps, close) => steps + RESUBMIT_FORM + close)
+    .replace(STAFF_CONFIRM_OLD, () => STAFF_CONFIRM_NEW)
+    .replace(staffNote, (m) => m + STAFF_REASON)
+    .replace(STAFF_DECISION_OLD, () => STAFF_DECISION_NEW);
+  console.log('applied rating expiry + resubmission markup patch');
+}
+
 // Brand type: Quicksand for display text (headings, buttons, anything set
 // bold); Albert Sans stays for running text and inputs. The framework
 // re-serializes inline styles at runtime, hence the spaced "font-weight: 800".

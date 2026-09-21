@@ -52,4 +52,16 @@ const DOCS = {
       console.log(email, path, r.status, JSON.stringify(await r.json().catch(() => ({}))));
     }
   }
+  // A certificate uploaded after a confirmation reads as a renewal waiting for
+  // staff, so the staff persona confirms Meridian's rating against the fresh
+  // upload (valid 18 months). Northline's stays unconfirmed: that is its story.
+  const sw = await fetch(BASE + '/api/demo/switch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'staff@demo.chartavia' }) });
+  const cookie = (sw.headers.get('set-cookie') || '').split(';')[0];
+  const until = new Date();
+  until.setUTCMonth(until.getUTCMonth() + 18);
+  const r = await fetch(BASE + '/api/staff/operators/3', {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ action: 'confirm_rating', expires: until.toISOString().slice(0, 10) }),
+  });
+  console.log('staff confirms Meridian rating until', until.toISOString().slice(0, 10), r.status);
 })().catch((e) => { console.error(e); process.exit(1); });

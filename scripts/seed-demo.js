@@ -65,9 +65,9 @@ INSERT OR IGNORE INTO faa135_aircraft (dsgn, tail, mms) VALUES
   ('MJGA085K', 'N502QS', NULL), ('MJGA085K', 'N510JK', NULL), ('BLWA221K', 'N1KE', NULL), ('NRLA417K', 'N787QS', NULL);
 
 -- Meridian: fully verified, approved by staff, ARGUS rating confirmed
-INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, safety_doc_name, safety_doc_at, safety_verified, safety_verified_at,
+INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, cert_faa_name, base_iata, safety_program, safety_doc_name, safety_doc_at, safety_verified, safety_verified_at, safety_expires,
   cert_doc_name, cert_doc_at, d085_name, d085_at, review_status, review_cert, review_note, reviewed_at, reviewed_by, checked_at, updated_at)
-VALUES (3, 'Meridian Jet Group', 'MJGA085K', 'Meridian Jet Group', 'TEB', 'ARGUS Platinum', 'meridian-argus-platinum.pdf', datetime('now'), 'ARGUS Platinum', datetime('now'),
+VALUES (3, 'Meridian Jet Group', 'MJGA085K', 'Meridian Jet Group', 'TEB', 'ARGUS Platinum', 'meridian-argus-platinum.pdf', datetime('now', '-1 minute'), 'ARGUS Platinum', datetime('now'), date('now', '+18 months'),
   'meridian-air-carrier-certificate.pdf', datetime('now'), 'meridian-d085.pdf', datetime('now'), 'approved', 'MJGA085K',
   'Spoke with the Director of Operations on the number listed with the FAA.', datetime('now'), 10, datetime('now'), datetime('now'));
 INSERT OR IGNORE INTO fleet_aircraft (id, operator_id, tail, model_claim, faa_mfr, faa_model, faa_reg_status, faa_status, on_cert, checked_at)
@@ -95,7 +95,7 @@ VALUES (4, 11, 'N787QS', 'Challenger 350', 'BOMBARDIER INC', 'BD-100-1A10', 'Val
 -- The staff persona (id 10) made the decisions above
 INSERT INTO staff_actions (actor_id, org_id, action, detail) SELECT 10, 3, 'approve', 'MJGA085K' WHERE NOT EXISTS (SELECT 1 FROM staff_actions);
 INSERT INTO staff_actions (actor_id, org_id, action, detail) SELECT 10, 5, 'approve', 'BLWA221K' WHERE (SELECT COUNT(*) FROM staff_actions) = 1;
-INSERT INTO staff_actions (actor_id, org_id, action, detail) SELECT 10, 3, 'confirm_rating', 'ARGUS Platinum' WHERE (SELECT COUNT(*) FROM staff_actions) = 2;
+INSERT INTO staff_actions (actor_id, org_id, action, detail) SELECT 10, 3, 'confirm_rating', 'ARGUS Platinum until ' || date('now', '+18 months') WHERE (SELECT COUNT(*) FROM staff_actions) = 2;
 
 -- Ava's completed + reviewed trip (gives Meridian a real rating & response time)
 INSERT OR IGNORE INTO requests (id, user_id, type, legs, pax, flex_days, cats, budget, needs, addons, notes, accepted_quote_id, trip_status, deposit_amount, deposit_status, created_at)

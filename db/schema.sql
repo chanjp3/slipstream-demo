@@ -77,9 +77,13 @@ CREATE TABLE IF NOT EXISTS operator_profiles (
   safety_doc_at TEXT,
   safety_verified TEXT,                   -- the rating staff confirmed against that document; travelers see
   safety_verified_at TEXT,                --   safety_program only while it equals this
+  safety_expires TEXT,                    -- YYYY-MM-DD from the audit certificate; the rating is hidden after it (required to show at all)
+  safety_reminded TEXT,                   -- last expiry email sent: 'soon:<date>' or 'expired:<date>'
   review_status TEXT,                     -- staff decision: 'approved' | 'declined'; NULL = in review
   review_cert TEXT,                       -- the certificate number the decision was made for (a change voids it)
   review_note TEXT,                       -- internal staff note, never sent to the operator
+  review_reason TEXT,                     -- what staff asked for when declining; the operator sees it
+  review_message TEXT,                    -- what the operator said changed when resubmitting
   reviewed_at TEXT,
   reviewed_by INTEGER,
   review_requested_at TEXT,               -- first time both automatic checks passed (staff notified once)

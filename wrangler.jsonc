@@ -28,7 +28,13 @@
   "vars": {
     "STATS_MIN_SAMPLE": "1",
     "PARTNER_NAME": "Morgan Hale",
-    "PARTNER_TITLE": "Partner Manager, Operators"
+    "PARTNER_TITLE": "Partner Manager, Operators",
+    // Emails sent by the daily job have no request to take a link origin from.
+    "APP_ORIGIN": "https://slipstream-demo.chandler-850.workers.dev"
+  },
+  // Daily at 14:00 UTC: rating expiry reminders (scheduled() in src/worker.js).
+  "triggers": {
+    "crons": ["0 14 * * *"]
   },
   "observability": {
     "enabled": true

@@ -155,6 +155,20 @@ that opens the shared chat drawer. Known gaps, in rough priority order:
   IS-BAO and upload the audit certificate; travelers see the rating only after
   staff confirm it against that document (`safety_verified` must equal
   `safety_program`, so changing the declared rating hides it again).
+- **Ratings expire.** Staff confirm a rating together with the expiry date on the
+  audit certificate (`safety_expires`, required, at most 5 years out). After that
+  date the rating drops off quotes, empty legs, trip documents and the public
+  list on its own. A daily job (`scheduled()`, cron `0 14 * * *` in
+  `wrangler.jsonc`) emails the operator 30 days ahead and again when it lapses,
+  once each; `POST /api/staff/sweep` runs the same job on demand. Links in those
+  emails come from the `APP_ORIGIN` var, since a scheduled run has no request:
+  update it when the custom domain goes live. A certificate uploaded after the
+  confirmation counts as a renewal and returns the operator to the staff queue.
+- **Declines carry a reason, and operators can resubmit.** Staff must say what is
+  missing when declining; the operator sees it on the bid desk, in the profile
+  and in the email. The team admin then resubmits from the profile with a note
+  on what changed (`POST /api/operator/review/resubmit`), which returns the
+  account to the queue. One resubmission per decline.
 - Ratings/reviews/response-time on quotes are still placeholders.
 - No email notifications, forgot-password reset flow, or rate limiting
   (password *change* exists in the account menu; *reset* needs email).
