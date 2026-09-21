@@ -14,6 +14,7 @@ const DEMO_PERSONAS = [
   { email: 'meridian@demo.chartavia', label: 'Meridian · Op Admin' },
   { email: 'dana@demo.chartavia', label: 'Dana · Op Member' },
   { email: 'bluewing@demo.chartavia', label: 'Bluewing · Operator' },
+  { email: 'staff@demo.chartavia', label: 'Concierge · Staff' },
 ];
 
 async function demoSessionFor(env, email) {
@@ -150,6 +151,13 @@ async function handlePage(request, env, path) {
       return serveAsset(env, request, path + '.html');
     }
 
+    if (path === '/concierge') return serveAsset(env, request, '/concierge.html');
+    const tripDoc = path.match(/^\/trip\/(RQ-\d+)$/);
+    if (tripDoc) {
+      if (!session) return redirect('/login');
+      return await tripDocPage(request, env, session, tripDoc[1]);
+    }
+
     // Never serve the app bundle directly — it must go through the auth gate.
     if (path === '/app.html') {
       return redirect('/app');
@@ -199,6 +207,8 @@ async function handleApi(request, env, path) {
     if (path === '/api/demo/switch' && method === 'POST') return await apiDemoSwitch(request, env);
     if (path === '/api/forgot' && method === 'POST') return await apiForgotPassword(request, env);
     if (path === '/api/reset' && method === 'POST') return await apiResetPassword(request, env);
+    if (path === '/api/concierge' && method === 'POST') return await apiConcierge(request, env);
+    if (path === '/api/public/stats' && method === 'GET') return await apiPublicStats(env);
 
     // Everything below requires a session. The user row is consulted on every
     // request: org membership changes, email changes and session-epoch bumps
@@ -206,7 +216,7 @@ async function handleApi(request, env, path) {
     const me = await getSession(request, env);
     if (!me) return json({ error: 'Not signed in' }, 401);
     const row = await env.DB.prepare(
-      'SELECT email, org_id, org_role, session_epoch FROM users WHERE id = ?'
+      'SELECT email, org_id, org_role, session_epoch, is_staff FROM users WHERE id = ?'
     ).bind(me.id).first();
     if (!row || (me.epoch || 0) !== (row.session_epoch || 0)) {
       const token = getCookie(request, 'slipstream_session');
@@ -214,6 +224,7 @@ async function handleApi(request, env, path) {
       return json({ error: 'Not signed in' }, 401);
     }
     me.email = row.email;
+    me.isStaff = !!row.is_staff;
     if (me.role === 'operator') {
       me.orgId = row.org_id || me.id;
       me.orgRole = row.org_role || 'admin';
@@ -246,6 +257,8 @@ async function handleApi(request, env, path) {
       return await apiRemoveMember(env, me, +m[1]);
     if ((m = path.match(/^\/api\/operator\/trips\/(\d+)\/expenses$/)) && method === 'POST')
       return await apiSetTripExpenses(request, env, me, +m[1]);
+    if ((m = path.match(/^\/api\/staff\/concierge\/(\d+)$/)) && method === 'POST')
+      return await apiStaffConcierge(request, env, me, +m[1]);
     if (path === '/api/bootstrap' && method === 'GET') return await apiBootstrap(env, me);
     if (path === '/api/requests' && method === 'POST') return await apiCreateRequest(request, env, me);
 
@@ -323,7 +336,7 @@ async function apiRegister(request, env) {
         .bind(userId, invite.code).run();
       await notifyUser(env, invite.org_id, name + ' joined your Chartavia team',
         [name + ' registered with your invite code and can now quote and message under your company profile.'],
-        new URL(request.url).origin + '/app', 'View your team');
+        new URL(request.url).origin + '/app', 'View your team', { kicker: 'TEAM' });
     } else {
       await env.DB.prepare('UPDATE users SET org_id = ?, org_role = ? WHERE id = ?')
         .bind(userId, 'admin', userId).run();
@@ -382,7 +395,7 @@ async function apiForgotPassword(request, env) {
       emailHtml('Reset your password',
         ['Someone (hopefully you) asked to reset the password for this account.',
          'The link below works once and expires in 30 minutes. If you didn\u2019t ask, ignore this email \u2014 nothing changes.'],
-        'Choose a new password', link));
+        'Choose a new password', link, { kicker: 'ACCOUNT' }));
     if (!env.RESEND_API_KEY) demoLink = link;
   }
   const res = { ok: true };
@@ -969,6 +982,288 @@ function depositFor(cats) {
   return amounts.length ? Math.max(...amounts) : 250;
 }
 
+// ------------------------------------------------------------ shared helpers
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function routeOfLegs(type, legs) {
+  if (!legs.length) return '';
+  if (type === 'round') return legs[0].from + ' ⇄ ' + legs[0].to;
+  return [legs[0].from, ...legs.map((l) => l.to)].join(' → ');
+}
+
+// ---------------------------------------------------------------- concierge
+
+const CONCIERGE_TOPICS = { trip: 'Planning a trip', operator: 'Operator partnership', general: 'General' };
+
+// Public: works signed out (the /concierge page) and signed in (the in-app
+// dialog). The message is stored before any email goes out, so nothing is
+// lost while no mail provider is configured.
+async function apiConcierge(request, env) {
+  const limited = await rateLimit(request, env, 'concierge');
+  if (limited) return limited;
+  const b = await request.json().catch(() => null);
+  if (!b) return json({ error: 'Invalid request body' }, 400);
+  if (b.website) return json({ ok: true }); // honeypot: only bots fill it
+
+  const session = await getSession(request, env);
+  const user = session
+    ? await env.DB.prepare('SELECT id, name, email FROM users WHERE id = ?').bind(session.id).first()
+    : null;
+  const name = String((user && user.name) || b.name || '').trim().slice(0, 80);
+  const email = String((user && user.email) || b.email || '').trim().slice(0, 120).toLowerCase();
+  const phone = String(b.phone || '').trim().slice(0, 40);
+  const topic = CONCIERGE_TOPICS[b.topic] ? b.topic : 'general';
+  const message = String(b.message || '').trim().slice(0, 2000);
+  const requestId = /^RQ-\d+$/.test(String(b.requestId || '')) ? String(b.requestId) : null;
+  if (!name) return json({ error: 'Tell us your name' }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email' }, 400);
+  if (message.length < 10) return json({ error: 'Add a few words about what you need' }, 400);
+
+  const res = await env.DB.prepare(
+    `INSERT INTO concierge_requests (user_id, name, email, phone, topic, request_id, message)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(user ? user.id : null, name, email, phone, topic, requestId, message).run();
+  const ref = 'CQ-' + res.meta.last_row_id;
+
+  const origin = new URL(request.url).origin;
+  await sendEmail(env, email, 'We have your message — ' + ref, emailHtml(
+    'We have your message',
+    ['Thank you, ' + name.split(/\s+/)[0] + '. A member of the Chartavia team will read your note and reply personally.'],
+    'Open Chartavia', origin + '/',
+    { kicker: 'CONCIERGE', quote: message, rows: [['Reference', ref], ['Topic', CONCIERGE_TOPICS[topic]]] }
+  ));
+  if (env.CONCIERGE_EMAIL) {
+    await sendEmail(env, env.CONCIERGE_EMAIL, 'Concierge ' + ref + ' from ' + name, emailHtml(
+      'New concierge request', ['Reply to the sender directly, then mark it handled on the concierge desk.'],
+      'Open the concierge desk', origin + '/app',
+      { kicker: 'STAFF', quote: message, rows: [['Reference', ref], ['From', name], ['Email', email], ['Phone', phone || '—'], ['Topic', CONCIERGE_TOPICS[topic]], ['Trip', requestId || '—']] }
+    ));
+  }
+  return json({ ok: true, ref });
+}
+
+async function conciergeDesk(env) {
+  const rows = (await env.DB.prepare(
+    `SELECT c.*, u.role AS user_role FROM concierge_requests c LEFT JOIN users u ON u.id = c.user_id
+     ORDER BY (c.status = 'closed'), c.created_at DESC LIMIT 100`
+  ).all()).results;
+  return {
+    newCount: rows.filter((r) => r.status === 'new').length,
+    items: rows.map((r) => ({
+      id: r.id, ref: 'CQ-' + r.id, name: r.name, email: r.email, phone: r.phone,
+      topic: r.topic, topicLabel: CONCIERGE_TOPICS[r.topic] || 'General',
+      member: r.user_role || null, requestId: r.request_id, message: r.message,
+      status: r.status, note: r.note, ago: timeAgo(r.created_at),
+    })),
+  };
+}
+
+async function apiStaffConcierge(request, env, me, id) {
+  if (!me.isStaff) return json({ error: 'Not found' }, 404);
+  const b = await request.json().catch(() => null);
+  const status = b && ['new', 'open', 'closed'].includes(b.status) ? b.status : null;
+  if (!status) return json({ error: 'Invalid status' }, 400);
+  const res = await env.DB.prepare(
+    `UPDATE concierge_requests SET status = ?, note = COALESCE(?, note), handled_by = ?, updated_at = datetime('now') WHERE id = ?`
+  ).bind(status, b.note == null ? null : String(b.note).slice(0, 1000), me.id, id).run();
+  if (!res.meta.changes) return json({ error: 'Not found' }, 404);
+  return json({ ok: true, desk: await conciergeDesk(env) });
+}
+
+// Who operators see as their contact. Configurable per deployment; the default
+// is a role, not a person.
+function partnerContact(env) {
+  return { name: env.PARTNER_NAME || 'Chartavia Partner Desk', title: env.PARTNER_TITLE || 'Operator partnerships' };
+}
+
+// ------------------------------------------------------------- public stats
+
+// Figures for the landing page. Anything computed from marketplace activity
+// is withheld until the sample is large enough to mean something.
+async function apiPublicStats(env) {
+  const min = Math.max(1, parseInt(env.STATS_MIN_SAMPLE || '10', 10) || 10);
+  const out = { faaOperators: null, faaAircraft: null, verifiedOperators: null, ratings: [], avgTripValue: null, quotesPerRequest: null, firstOfferMins: null };
+  try {
+    const faa = await env.DB.prepare(
+      'SELECT (SELECT COUNT(*) FROM faa135_operators) AS ops, (SELECT COUNT(*) FROM faa135_aircraft) AS ac'
+    ).first();
+    out.faaOperators = faa.ops || null;
+    out.faaAircraft = faa.ac || null;
+  } catch (e) { /* FAA tables not loaded in this database */ }
+
+  const orgs = (await env.DB.prepare(
+    `SELECT p.cert_number, p.cert_faa_name, p.d085_name, p.safety_program, p.cert_doc_name,
+            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id) AS fleet_n,
+            (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.operator_id = p.user_id AND f.faa_status = 'verified') AS fleet_ok
+     FROM operator_profiles p`
+  ).all()).results;
+  const verified = orgs.filter((o) => verificationBadge(o).startsWith('FAA 135'));
+  if (verified.length >= min) out.verifiedOperators = verified.length;
+  // Ratings are operator-declared; only count ones backed by an uploaded certificate.
+  out.ratings = [...new Set(verified.filter((o) => o.safety_program && o.cert_doc_name).map((o) => o.safety_program))];
+
+  // Seed accounts (hash 'x', unloginable) are placeholders, not activity.
+  const trips = await env.DB.prepare(
+    `SELECT COUNT(*) AS n, AVG(q.price) AS avg FROM requests r JOIN quotes q ON q.id = r.accepted_quote_id
+     JOIN users u ON u.id = r.user_id AND u.hash != 'x'
+     WHERE COALESCE(r.trip_status, 'accepted') != 'cancelled'`
+  ).first();
+  if (trips.n >= min) out.avgTripValue = Math.round(trips.avg / 100) * 100;
+
+  const quoted = (await env.DB.prepare(
+    `SELECT COUNT(q.id) AS n, (julianday(MIN(q.created_at)) - julianday(r.created_at)) * 1440 AS mins
+     FROM requests r JOIN quotes q ON q.request_id = r.id
+     JOIN users u ON u.id = r.user_id AND u.hash != 'x'
+     GROUP BY r.id ORDER BY mins`
+  ).all()).results;
+  if (quoted.length >= min) {
+    out.quotesPerRequest = Math.round((quoted.reduce((s, r) => s + r.n, 0) / quoted.length) * 10) / 10;
+    const mins = quoted.map((r) => r.mins).filter((m) => m != null && m >= 0);
+    if (mins.length) out.firstOfferMins = Math.round(mins[Math.floor(mins.length / 2)]);
+  }
+
+  return new Response(JSON.stringify(out), {
+    headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=300' },
+  });
+}
+
+// ------------------------------------------------------------ trip document
+
+const CAT_LABELS = { prop: 'Turboprop', light: 'Light jet', mid: 'Midsize jet', smid: 'Super-midsize jet', heavy: 'Heavy jet', ulr: 'Ultra-long-range jet' };
+
+function fmtLegDate(d) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+  if (!m) return d || '—';
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
+// A print-ready page for an accepted trip: the traveler, the winning operator's
+// team and staff can open it, and the browser's print dialog saves it as a PDF.
+async function tripDocPage(request, env, session, requestId) {
+  const page = (body, status) => new Response(body, { status: status || 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  const missing = () => page(tripDocShell('Trip not found', '<div class="body"><h1>We could not find that trip</h1><p class="lead">It may not have an accepted offer yet, or it belongs to a different account.</p></div>', ''), 404);
+
+  const req = await env.DB.prepare(
+    'SELECT r.*, u.name AS client_name FROM requests r JOIN users u ON u.id = r.user_id WHERE r.id = ?'
+  ).bind(requestId).first();
+  const viewer = await env.DB.prepare('SELECT id, role, org_id, is_staff FROM users WHERE id = ?').bind(session.id).first();
+  if (!req || !req.accepted_quote_id || !viewer) return missing();
+  const q = await env.DB.prepare(
+    `SELECT q.*, u.name AS operator_name, COALESCE(u.org_id, u.id) AS org
+     FROM quotes q JOIN users u ON u.id = q.operator_id WHERE q.id = ?`
+  ).bind(req.accepted_quote_id).first();
+  if (!q) return missing();
+  const isClient = req.user_id === viewer.id;
+  const isOperator = viewer.role === 'operator' && (viewer.org_id || viewer.id) === q.org;
+  if (!isClient && !isOperator && !viewer.is_staff) return missing();
+
+  const op = await getOperatorProfile(env, q.org);
+  const company = (op.profile && op.profile.company) || q.operator_name;
+  const cert = op.profile && op.profile.cert_number;
+  const legs = JSON.parse(req.legs || '[]');
+  const list = (s) => { try { return JSON.parse(s || '[]'); } catch (e) { return []; } };
+
+  let acName, acTail = '', acSeats = '';
+  if (q.aircraft.includes('|')) { [acTail, acName] = q.aircraft.split('|'); }
+  else { const f = FLEET[q.aircraft] || { name: q.aircraft, seats: '' }; acName = f.name; acSeats = f.seats; }
+
+  const status = req.trip_status || 'accepted';
+  const title = { accepted: 'Trip summary', confirmed: 'Trip confirmation', completed: 'Trip record', cancelled: 'Cancelled trip' }[status];
+  const statusNote = {
+    accepted: 'Offer accepted. Awaiting the operator’s confirmation.',
+    confirmed: 'Confirmed by the operator. Your aircraft is reserved.',
+    completed: 'Flown and marked complete by the operator.',
+    cancelled: 'This trip was cancelled.',
+  }[status];
+  const money = (n) => '$' + Number(n || 0).toLocaleString('en-US');
+  const fee = {
+    kept: money(req.deposit_amount) + ' deposit applied (demo billing, no charge made)',
+    held: money(req.deposit_amount) + ' held (demo billing, no charge made)',
+    refunded: 'Refunded', waived_first: 'Waived: first request', waived_plus: 'Waived: Plus member',
+  }[req.deposit_status] || '—';
+  const kv = (rows) => '<div class="kv">' + rows.filter((r) => r[1]).map((r) => '<div><span>' + escHtml(r[0]) + '</span><span>' + escHtml(r[1]) + '</span></div>').join('') + '</div>';
+
+  const body = '<div class="body">'
+    + '<div class="status s-' + status + '">' + escHtml(status.toUpperCase()) + '</div>'
+    + '<h1>' + escHtml(title) + '</h1><p class="lead">' + escHtml(statusNote) + '</p>'
+    + '<div class="route">' + escHtml(routeOfLegs(req.type, legs)) + '</div>'
+    + '<section><div class="k">Itinerary</div><table class="legs"><thead><tr><th>Leg</th><th>Date</th><th>Departs</th><th>From</th><th>To</th></tr></thead><tbody>'
+    + legs.map((l, i) => '<tr><td>' + (i + 1) + '</td><td>' + escHtml(fmtLegDate(l.date)) + '</td><td>' + escHtml(l.time ? l.time + ' local' : '—') + '</td><td class="code">' + escHtml(l.from) + '</td><td class="code">' + escHtml(l.to) + '</td></tr>').join('')
+    + '</tbody></table></section>'
+    + '<section class="grid"><div><div class="k">Aircraft and operator</div>' + kv([
+      ['Operator', company], ['Aircraft', acName], ['Registration', acTail], ['Seats', acSeats && String(acSeats)],
+      ['Part 135 certificate', cert], ['FAA check', op.badge], ['Safety rating (operator-declared)', op.profile && op.profile.safety_program],
+    ]) + '</div><div><div class="k">Travel party</div>' + kv([
+      ['Traveler', req.client_name], ['Passengers', String(req.pax)],
+      ['Requested cabin', list(req.cats).map((c) => CAT_LABELS[c] || c).join(', ')],
+      ['Special requirements', list(req.needs).join(', ')], ['Add-ons', list(req.addons).join(', ')],
+    ]) + '</div></section>'
+    + (req.notes ? '<section><div class="k">Notes from the traveler</div><p class="note">' + escHtml(req.notes) + '</p></section>' : '')
+    + '<section class="grid"><div><div class="k">Charter price</div><div class="price">' + money(q.price) + '</div>'
+    + '<p class="small">Payable directly to ' + escHtml(company) + ' under your charter agreement.</p></div>'
+    + '<div><div class="k">Chartavia</div>' + kv([['Platform fee', fee], ['Contract', q.contract_type ? (q.contract_name || 'On file') + ' (in the conversation)' : 'Shared in the conversation when ready'], ['Reference', req.id]]) + '</div></section>'
+    + '<p class="fine">This document summarizes a charter arranged on Chartavia. The charter agreement between the traveler and the operator governs the flight, including price, payment, cancellation and liability. '
+    + 'Chartavia is a marketplace. It is not a direct or indirect air carrier and does not operate aircraft. '
+    + (cert ? 'The flight is operated by ' + escHtml(company) + ' under FAA Part 135 air carrier certificate ' + escHtml(cert) + '.' : 'The flight is operated by ' + escHtml(company) + ', the certificate holder.')
+    + ' Questions: message your ' + (isOperator ? 'client' : 'operator') + ' in Chartavia, or reach the concierge from the app.</p>'
+    + '<p class="gen">Generated ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC</p></div>';
+
+  return page(tripDocShell(title + ' ' + req.id, body, req.id));
+}
+
+function tripDocShell(title, body, ref) {
+  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+    + '<title>' + escHtml(title) + ' — Chartavia</title><meta name="robots" content="noindex">'
+    + '<link rel="icon" type="image/svg+xml" href="/favicon.svg">'
+    + '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">'
+    + '<style>' + TRIP_DOC_CSS + '</style></head><body>'
+    + '<div class="bar"><a href="/app">← Back to Chartavia</a>' + (ref ? '<button onclick="window.print()">Save as PDF or print</button>' : '') + '</div>'
+    + '<div class="sheet"><div class="head"><div class="brand"><img class="tile" src="/favicon.svg" alt=""><img class="word" src="/wordmark-white.svg" alt="Chartavia"></div>'
+    + (ref ? '<div class="doc"><div class="dk">TRIP REFERENCE</div><div class="id">' + escHtml(ref) + '</div></div>' : '') + '</div>'
+    + body + '</div></body></html>';
+}
+
+const TRIP_DOC_CSS = `
+:root{--navy:#16233b;--blue:#2e6be6;--gold:#c6a667;--gold-ink:#8a6b2e;--ivory:#f8f6f1;--line:#e8e3d9;--slate:#4a5a76;--mist:#68758d}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Albert Sans',Helvetica,Arial,sans-serif;background:var(--ivory);color:var(--navy);padding:26px 16px 60px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bar{max-width:820px;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.bar a{color:var(--mist);font-size:13px;font-weight:600;text-decoration:none}
+.bar button{font-family:'Quicksand','Albert Sans',sans-serif;background:var(--navy);color:#fff;border:none;border-radius:999px;padding:10px 20px;font-size:13.5px;font-weight:700;cursor:pointer}
+.sheet{max-width:820px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.head{background:var(--navy);color:#fff;padding:24px 40px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--gold)}
+.brand{display:flex;align-items:center;gap:12px}.tile{width:38px;height:38px;display:block}.word{height:15px;display:block}
+.doc{text-align:right}.dk{font-family:'Quicksand',sans-serif;font-size:10px;letter-spacing:2.4px;color:#dcc48f;font-weight:700}
+.id{font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;margin-top:3px}
+.body{padding:32px 40px 28px}
+h1{font-family:'Quicksand','Albert Sans',sans-serif;font-size:27px;font-weight:700;letter-spacing:-.4px;margin-top:10px}
+.lead{color:var(--slate);font-size:14.5px;margin-top:6px;line-height:1.55}
+.status{display:inline-block;font-family:'Quicksand',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:1.8px;padding:4px 11px;border-radius:999px;background:#eef3fd;color:var(--blue)}
+.s-confirmed,.s-completed{background:#e8f6ee;color:#1e5e3c}.s-cancelled{background:#fdecec;color:#b3261e}
+.route{font-family:ui-monospace,Menlo,monospace;font-size:30px;font-weight:700;letter-spacing:-.5px;margin-top:20px}
+section{margin-top:28px}
+.k{font-family:'Quicksand',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:2.2px;color:var(--gold-ink);text-transform:uppercase;display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.k::before{content:'';width:24px;height:1px;background:var(--gold)}
+table.legs{width:100%;border-collapse:collapse;margin-top:6px}
+th{text-align:left;font-size:10.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--mist);font-weight:700;padding:8px 10px 8px 0;border-bottom:1px solid var(--gold)}
+td{padding:12px 10px 12px 0;border-bottom:1px solid var(--line);font-size:14px}
+td.code{font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:15px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:26px 40px}
+.kv div{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.kv span:first-child{color:var(--mist);flex:none}.kv span:last-child{font-weight:600;text-align:right}
+.price{font-family:'Quicksand',sans-serif;font-size:30px;font-weight:700;margin-top:4px}
+.small{font-size:12.5px;color:var(--mist);margin-top:4px;line-height:1.5}
+.note{font-size:14px;color:var(--slate);line-height:1.6;white-space:pre-wrap}
+.fine{margin-top:30px;padding-top:16px;border-top:1px solid var(--line);font-size:11.5px;line-height:1.65;color:var(--mist)}
+.gen{font-size:10.5px;color:#a3adc0;margin-top:10px}
+@media (max-width:640px){.head{padding:20px}.body{padding:24px 20px}.grid{grid-template-columns:1fr}.route{font-size:23px}h1{font-size:23px}}
+@media print{body{background:#fff;padding:0}.bar{display:none}.sheet{border:none;border-radius:0;max-width:none}@page{margin:12mm}section,.fine{break-inside:avoid}}
+`;
+
 // ------------------------------------------------------------------- email
 
 // Sends via Resend when RESEND_API_KEY is configured; otherwise records the
@@ -988,26 +1283,43 @@ async function sendEmail(env, to, subject, html) {
   } catch (e) { console.error('sendEmail failed:', e.message); }
 }
 
-function emailHtml(title, lines, ctaText, ctaUrl) {
-  // Email clients don't render SVG, so the header uses the hosted PNG icon.
-  let icon = '';
-  try {
-    if (ctaUrl) icon = '<img src="' + new URL(ctaUrl).origin + '/icon-192.png" width="30" height="30" alt="" style="border-radius:7px;vertical-align:middle;margin-right:10px">';
-  } catch (e) { /* relative link: no icon */ }
-  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:26px">'
-    + '<div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #c6a667">' + icon + '<span style="font-size:16px;font-weight:700;letter-spacing:3px;color:#16233b;vertical-align:middle">CHARTAVIA</span></div>'
-    + '<div style="font-size:16px;font-weight:700;color:#16233b;margin-bottom:10px">' + title + '</div>'
-    + lines.map((l) => '<p style="font-size:14px;color:#4a5a76;line-height:1.6;margin:0 0 10px">' + l + '</p>').join('')
-    + (ctaUrl ? '<a href="' + ctaUrl + '" style="display:inline-block;margin-top:8px;background:#2E6BE6;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 20px;border-radius:9px">' + (ctaText || 'Open Chartavia') + '</a>' : '')
-    + '<p style="font-size:12px;color:#8593ab;margin-top:24px">You received this because of activity on your Chartavia account.</p>'
-    + '</div>';
+// Table layout and inline styles only: that is what survives Outlook and
+// Gmail. Everything dynamic is escaped. opts: { kicker, rows: [[label, value]],
+// quote, preheader }.
+function emailHtml(title, lines, ctaText, ctaUrl, opts) {
+  const o = opts || {};
+  let origin = '';
+  try { if (ctaUrl) origin = new URL(ctaUrl).origin; } catch (e) { /* relative link: no icon */ }
+  const font = 'font-family:Helvetica,Arial,sans-serif;';
+  const rows = (o.rows || []).filter((r) => r[1] != null && r[1] !== '');
+  return '<!doctype html><html><body style="margin:0;padding:0;background:#f8f6f1">'
+    + '<div style="display:none;max-height:0;overflow:hidden;opacity:0">' + escHtml(o.preheader || lines[0] || title) + '</div>'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f6f1"><tr><td align="center" style="padding:28px 12px">'
+    + '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px">'
+    + '<tr><td style="background:#16233b;padding:20px 32px;border-bottom:2px solid #c6a667;border-radius:6px 6px 0 0">'
+    + (origin ? '<img src="' + origin + '/icon-192.png" width="30" height="30" alt="" style="border-radius:7px;vertical-align:middle;margin-right:11px">' : '')
+    + '<span style="' + font + 'font-size:15px;font-weight:700;letter-spacing:4px;color:#ffffff;vertical-align:middle">CHARTAVIA</span></td></tr>'
+    + '<tr><td style="background:#ffffff;padding:34px 32px 30px;border:1px solid #e8e3d9;border-top:none">'
+    + (o.kicker ? '<div style="' + font + 'font-size:11px;font-weight:700;letter-spacing:2.4px;color:#8a6b2e;margin-bottom:10px">' + escHtml(o.kicker) + '</div>' : '')
+    + '<div style="' + font + 'font-size:23px;line-height:1.25;font-weight:700;color:#16233b;margin-bottom:14px">' + escHtml(title) + '</div>'
+    + lines.map((l) => '<p style="' + font + 'font-size:15px;color:#4a5a76;line-height:1.65;margin:0 0 12px">' + escHtml(l) + '</p>').join('')
+    + (o.quote ? '<div style="' + font + 'margin-top:6px;padding:14px 16px;background:#f8f6f1;border-left:3px solid #c6a667;font-size:14px;line-height:1.6;color:#4a5a76;white-space:pre-wrap">' + escHtml(o.quote) + '</div>' : '')
+    + (rows.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;border-top:1px solid #c6a667">'
+      + rows.map((r) => '<tr><td style="' + font + 'padding:10px 0;border-bottom:1px solid #e8e3d9;font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:#8593ab;width:40%">' + escHtml(r[0])
+        + '</td><td style="' + font + 'padding:10px 0;border-bottom:1px solid #e8e3d9;font-size:14px;font-weight:700;color:#16233b;text-align:right">' + escHtml(r[1]) + '</td></tr>').join('')
+      + '</table>' : '')
+    + (ctaUrl ? '<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px"><tr><td style="background:#2e6be6;border-radius:999px">'
+      + '<a href="' + escHtml(ctaUrl) + '" style="' + font + 'display:inline-block;padding:13px 28px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none">' + escHtml(ctaText || 'Open Chartavia') + '</a></td></tr></table>' : '')
+    + '</td></tr>'
+    + '<tr><td style="' + font + 'padding:20px 32px 0;font-size:11.5px;line-height:1.6;color:#8593ab">You received this because of your activity with Chartavia.<br>'
+    + 'Chartavia is a marketplace, not an air carrier. Flights are operated by FAA-certificated Part 135 operators.</td></tr>'
+    + '</table></td></tr></table></body></html>';
 }
 
-async function notifyUser(env, userId, subject, lines, ctaUrl, ctaText) {
+async function notifyUser(env, userId, subject, lines, ctaUrl, ctaText, opts) {
   const u = await env.DB.prepare('SELECT email, name FROM users WHERE id = ?').bind(userId).first();
-  if (!u || u.hash === 'x') { /* unloginable demo rows have no inbox */ }
   if (!u) return;
-  await sendEmail(env, u.email, subject, emailHtml(subject, lines, ctaText, ctaUrl));
+  await sendEmail(env, u.email, subject, emailHtml((opts && opts.title) || subject, lines, ctaText, ctaUrl, opts));
 }
 
 // At most one email per key per hour (e.g. chat pings per conversation).
@@ -1027,9 +1339,13 @@ async function apiBootstrap(env, me) {
     name: row ? row.name : me.name,
     prefs: JSON.parse(row?.prefs || '{}'),
     plan: row?.plan || 'free',
+    isStaff: !!me.isStaff,
   };
   if (me.role === 'client') {
-    return json({ me: meOut, requests: await clientRequests(env, me), emptyLegs: await emptyLegBoard(env) });
+    return json({
+      me: meOut, requests: await clientRequests(env, me), emptyLegs: await emptyLegBoard(env),
+      concierge: me.isStaff ? await conciergeDesk(env) : null,
+    });
   }
   // The plan is org-wide: members inherit the admin's plan.
   const adminRow = await env.DB.prepare('SELECT plan FROM users WHERE id = ?').bind(me.orgId).first();
@@ -1054,6 +1370,8 @@ async function apiBootstrap(env, me) {
     operatorProfile: profile,
     myEmptyLegs: await myEmptyLegs(env, me),
     analytics: await operatorAnalytics(env, me),
+    partner: partnerContact(env),
+    concierge: me.isStaff ? await conciergeDesk(env) : null,
   });
 }
 
@@ -1365,10 +1683,19 @@ async function apiSubmitQuote(request, env, me, requestId) {
   } catch (e) {
     return json({ error: 'You already submitted a quote for this request' }, 409);
   }
-  await notifyUser(env, req.user_id, 'New sealed offer on ' + requestId,
-    ['A verified operator submitted a sealed offer of $' + price.toLocaleString('en-US') + ' on your request ' + requestId + '.',
-     'Compare it side by side with your other offers, message the operator, and accept when ready.'],
-    new URL(request.url).origin + '/app', 'View your offers');
+  {
+    const route = routeOfLegs(req.type, JSON.parse(req.legs || '[]'));
+    const badge = (await getOperatorProfile(env, me.orgId)).badge;
+    await notifyUser(env, req.user_id, 'New sealed offer on ' + requestId,
+      ['An operator has answered your request with a sealed offer. Their identity stays private until you accept.',
+       'Compare it side by side with your other offers, message the operator, and accept when you are ready.'],
+      new URL(request.url).origin + '/app', 'View your offers',
+      { kicker: 'NEW OFFER', title: 'A new offer for ' + route, rows: [
+        ['Trip', requestId], ['Route', route],
+        ['Aircraft', aircraft.includes('|') ? aircraft.split('|')[1] : FLEET[aircraft].name],
+        ['Offer', '$' + price.toLocaleString('en-US')], ['FAA check', badge], ['Valid for', validHours + ' hours'],
+      ] });
+  }
   return json({ ok: true, price });
 }
 
@@ -1398,12 +1725,22 @@ async function apiAcceptQuote(request, env, me, requestId) {
     ).bind(quoteId).first();
     if (winner) {
       const origin = new URL(request.url).origin;
-      const lines = ['Your sealed quote on ' + requestId + ' was accepted \u2014 your identity is now visible to the client.',
-        'Open the conversation to coordinate the contract and confirm the trip.'];
-      await notifyUser(env, winner.operator_id, 'Your quote was accepted \u2014 ' + requestId, lines, origin + '/app', 'Open the conversation');
+      const legs = JSON.parse(req.legs || '[]');
+      const route = routeOfLegs(req.type, legs);
+      const rows = [['Trip', requestId], ['Route', route], ['First departure', legs[0] ? fmtLegDate(legs[0].date) : ''],
+        ['Passengers', String(req.pax)], ['Price', '$' + Number(quote.price).toLocaleString('en-US')]];
+      const lines = ['Your sealed quote on ' + requestId + ' was accepted. Your identity is now visible to the client.',
+        'Open the conversation to coordinate the contract and confirm the trip. A printable trip sheet is linked there.'];
+      const won = { kicker: 'TRIP WON', title: 'Your quote was accepted', rows };
+      await notifyUser(env, winner.operator_id, 'Your quote was accepted \u2014 ' + requestId, lines, origin + '/app', 'Open the conversation', won);
       if (winner.org !== winner.operator_id) {
-        await notifyUser(env, winner.org, 'Your team won ' + requestId, lines, origin + '/app', 'Open the conversation');
+        await notifyUser(env, winner.org, 'Your team won ' + requestId, lines, origin + '/app', 'Open the conversation', won);
       }
+      await notifyUser(env, me.id, 'Offer accepted \u2014 ' + requestId,
+        ['Your operator now has your details and will confirm the aircraft. The charter agreement and payment are settled directly with them.',
+         'Your trip summary is ready to view, save as a PDF, or forward.'],
+        origin + '/trip/' + requestId, 'View your trip summary',
+        { kicker: 'OFFER ACCEPTED', title: 'You are on your way: ' + route, rows });
     }
   }
   return json({ ok: true, acceptedQuoteId: quoteId });
@@ -1464,11 +1801,15 @@ async function apiTripAction(request, env, me, requestId) {
     const line = next === 'confirmed' ? 'The operator confirmed ' + requestId + ' \u2014 your aircraft is locked in.'
       : next === 'completed' ? requestId + ' is marked complete. How was it? Leave a review to help other travelers.'
       : requestId + ' was cancelled.';
+    const update = { kicker: 'TRIP UPDATE', title: label, rows: [
+      ['Trip', requestId], ['Route', routeOfLegs(req.type, JSON.parse(req.legs || '[]'))], ['Status', next.charAt(0).toUpperCase() + next.slice(1)],
+    ] };
     if (isWinningOp) {
-      await notifyUser(env, req.user_id, label + ' \u2014 ' + requestId, [line], origin + '/app', 'Open Chartavia');
+      await notifyUser(env, req.user_id, label + ' \u2014 ' + requestId, [line], origin + '/trip/' + requestId,
+        next === 'confirmed' ? 'View your trip confirmation' : 'View the trip record', update);
     } else if (q) {
       const bidder = await env.DB.prepare('SELECT operator_id FROM quotes q WHERE q.id = ?').bind(req.accepted_quote_id).first();
-      if (bidder) await notifyUser(env, bidder.operator_id, 'Trip cancelled by the client \u2014 ' + requestId, [line], origin + '/app', 'Open Chartavia');
+      if (bidder) await notifyUser(env, bidder.operator_id, 'Trip cancelled by the client \u2014 ' + requestId, [line], origin + '/app', 'Open Chartavia', update);
     }
   }
   return json({ ok: true, tripStatus: next });
@@ -1773,7 +2114,7 @@ async function apiSendMessage(request, env, me, quoteId) {
     if (await shouldNotify(env, 'msg:' + quoteId + ':' + recipient)) {
       await notifyUser(env, recipient, 'New message on Chartavia',
         ['You have a new message in one of your Chartavia conversations.'],
-        new URL(request.url).origin + '/app', 'Read & reply');
+        new URL(request.url).origin + '/app', 'Read and reply', { kicker: 'MESSAGE' });
     }
   }
   return json({ ok: true });

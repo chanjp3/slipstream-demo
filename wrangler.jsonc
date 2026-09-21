@@ -23,6 +23,13 @@
       "id": "7319109e528e4177a931bb3bfe9aae79"
     }
   ],
+  // Demo-only: show marketplace figures from the small seeded sample, and a
+  // fictional partner contact.
+  "vars": {
+    "STATS_MIN_SAMPLE": "1",
+    "PARTNER_NAME": "Morgan Hale",
+    "PARTNER_TITLE": "Partner Manager, Operators"
+  },
   "observability": {
     "enabled": true
   }

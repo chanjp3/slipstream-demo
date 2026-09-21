@@ -25,6 +25,7 @@ async function hash(password, saltHex) {
     [3, 'meridian@demo.chartavia', 'Meridian Charter Ops', 'operator', 'pro', 3, "admin"],
     [4, 'dana@demo.chartavia', 'Dana Reyes', 'operator', 'free', 3, "member"],
     [5, 'bluewing@demo.chartavia', 'Bluewing Charters', 'operator', 'free', 5, "admin"],
+    [10, 'staff@demo.chartavia', 'Chartavia Concierge', 'client', 'free', null, null],
   ];
   const marketClients = [
     [6, 'mkt-priya@demo.chartavia', 'Priya Nair'],
@@ -42,6 +43,11 @@ async function hash(password, saltHex) {
   for (const [id, email, name] of marketClients) {
     lines.push(`INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (${id}, '${email}', '${name}', 'client', 'x', 'x', 'free');`);
   }
+
+  // Staff persona (id 10) works the concierge desk; two example requests.
+  lines.push(`UPDATE users SET is_staff = 1 WHERE id = 10;
+INSERT INTO concierge_requests (user_id, name, email, topic, request_id, message, status, created_at) SELECT 1, 'Ava Sinclair', 'ava@demo.chartavia', 'trip', 'RQ-2601', 'We are six adults plus two dogs, Teterboro to Aspen on the 21st. Is a super-mid enough for the bags and ski gear, or should I ask for a heavy?', 'new', datetime('now', '-2 hours') WHERE NOT EXISTS (SELECT 1 FROM concierge_requests);
+INSERT INTO concierge_requests (user_id, name, email, phone, topic, message, status, note, created_at) SELECT 5, 'Bluewing Charters', 'bluewing@demo.chartavia', '561 555 0142', 'operator', 'Our D085 was reissued last week with two new tails. What is the fastest way to get them verified so we can quote with them?', 'open', 'Asked them to upload the new D085; re-run the FAA check after.', datetime('now', '-1 day') WHERE (SELECT COUNT(*) FROM concierge_requests) = 1;`);
 
   lines.push(`
 -- Meridian: fully verified operator org (badge: FAA-checked fleet)

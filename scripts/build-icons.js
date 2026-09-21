@@ -121,6 +121,9 @@ served('icon-192.png', render(192));
 served('icon-512.png', render(512));
 served('icon-maskable-512.png', render(512, { maskable: true }));
 served('favicon.svg', logo.tileSvg(512));
+// Server-rendered pages (the trip document) reference the wordmark as a file.
+served('wordmark-white.svg', logo.wordmarkSvg(100, '#FFFFFF'));
+served('wordmark-navy.svg', logo.wordmarkSvg(100, logo.NAVY));
 
 // `--brand` also writes the downloadable logo files (main repo only).
 if (!process.argv.includes('--brand')) process.exit(0);

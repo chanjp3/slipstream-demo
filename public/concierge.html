@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talk to a charter specialist — Chartavia</title>
+  <meta name="description" content="Prefer to talk your trip through? Send a note and a member of the Chartavia team replies personally.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Albert Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: #16233b; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #fff; border-radius: 20px; padding: 40px; border-top: 2px solid #c6a667; width: 100%; max-width: 520px; box-shadow: 0 24px 60px rgba(10,30,80,.35); }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+    .logo-mark { display: flex; }
+    .logo-mark svg { width: 36px; height: 36px; display: block; }
+    .logo-word { display: flex; color: #16233b; }
+    .logo-word svg { display: block; }
+    .kicker { font-family: 'Quicksand', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 2.4px; color: #8a6b2e; display: flex; align-items: center; gap: 10px; }
+    .kicker::before { content: ''; width: 26px; height: 1px; background: #c6a667; }
+    h1 { font-family: 'Quicksand', 'Albert Sans', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -.4px; color: #16233b; margin-top: 10px; line-height: 1.2; }
+    .tagline { color: #68758d; font-size: 14.5px; margin-top: 8px; line-height: 1.55; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #4a5a76; margin: 16px 0 6px; }
+    label span { font-weight: 400; color: #8593ab; }
+    input, select, textarea { width: 100%; padding: 12px 14px; font-size: 15px; font-family: inherit; border: 1px solid #dde5f0; border-radius: 10px; color: #16233b; outline: none; background: #fff; }
+    textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+    input:focus, select:focus, textarea:focus { border-color: #2E6BE6; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .hp { position: absolute; left: -9999px; }
+    button { width: 100%; margin-top: 22px; padding: 13px; font-size: 15px; font-weight: 700; font-family: 'Quicksand', 'Albert Sans', sans-serif; letter-spacing: .2px; color: #fff; background: #2E6BE6; border: none; border-radius: 999px; cursor: pointer; }
+    button:hover { background: #2558c4; }
+    button:disabled { background: #a9b4c8; cursor: default; }
+    .msg { display: none; margin-top: 16px; padding: 12px 14px; font-size: 13.5px; border-radius: 8px; line-height: 1.5; }
+    .msg.err { background: #fdecec; color: #b3261e; }
+    .done { display: none; text-align: center; padding: 10px 0 4px; }
+    .done .tick { width: 46px; height: 46px; border-radius: 50%; background: #16233b; color: #dcc48f; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; }
+    .done h2 { font-family: 'Quicksand', sans-serif; font-size: 22px; color: #16233b; margin-top: 14px; }
+    .done p { color: #68758d; font-size: 14.5px; line-height: 1.6; margin-top: 8px; }
+    .alt { margin-top: 20px; text-align: center; font-size: 14px; color: #68758d; }
+    .alt a { color: #2E6BE6; font-weight: 600; text-decoration: none; }
+    @media (max-width: 520px) { .card { padding: 28px 22px; } .two { grid-template-columns: 1fr; gap: 0; } h1 { font-size: 23px; } }
+  </style>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#16233b">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+</head>
+<body>
+  <div class="card">
+    <a class="logo" href="/" style="text-decoration:none">
+      <div class="logo-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="36" height="36" role="img" aria-label="Chartavia"><rect width="512" height="512" rx="116" fill="#2E6BE6"/><g transform="rotate(45 256 256) translate(256 256) scale(1.04) translate(-256 -262)"><g><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><g transform="translate(512 0) scale(-1 1)"><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><path d="M256,40 C276,70 282,118 282,166 L282,398 C282,432 268,456 256,470 C244,456 230,432 230,398 L230,166 C230,118 236,70 256,40 Z" fill="#fff"/></g></svg></div>
+      <div class="logo-word"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 823.94 100" width="131.83" height="16" role="img" aria-label="Chartavia"><g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 0)"><path d="M82.94,22.36 A43,43 0 1 0 82.94,77.64"/></g><g transform="translate(113.94 0)"><path d="M7,7 V93"/><path d="M73,7 V93"/><path d="M7,50 H73"/></g><g transform="translate(213.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(321.94 0)"><path d="M7,93 V7 H42 A24.5,24.5 0 0 1 42,56 H7"/><path d="M36,56 L71,93"/></g><g transform="translate(417.94 0)"><path d="M7,7 H75"/><path d="M41,7 V93"/></g><g transform="translate(505.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(597.94 0)"><path d="M7,7 L45,93 L83,7"/></g><g transform="translate(703.94 0)"><path d="M7,7 V93"/></g><g transform="translate(733.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g></g></svg></div>
+    </a>
+    <div id="formWrap">
+      <div class="kicker">CONCIERGE</div>
+      <h1>Talk to a charter specialist</h1>
+      <p class="tagline">Not sure which cabin you need, or planning something unusual? Tell us about it. A person, not a bot, reads every message and replies by the channel you prefer.</p>
+      <form id="form">
+        <div class="two">
+          <div><label for="name">Name</label><input id="name" autocomplete="name" required maxlength="80"></div>
+          <div><label for="email">Email</label><input id="email" type="email" autocomplete="email" required maxlength="120"></div>
+        </div>
+        <div class="two">
+          <div><label for="phone">Phone <span>(optional)</span></label><input id="phone" type="tel" autocomplete="tel" maxlength="40"></div>
+          <div><label for="topic">I am</label><select id="topic"><option value="trip">Planning a trip</option><option value="operator">An operator</option><option value="general">Asking something else</option></select></div>
+        </div>
+        <label for="message">How can we help?</label>
+        <textarea id="message" required minlength="10" maxlength="2000" placeholder="Route, dates, passengers, anything unusual."></textarea>
+        <input class="hp" id="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="msg err" id="msg"></div>
+        <button type="submit" id="submit">Send to the concierge</button>
+      </form>
+    </div>
+    <div class="done" id="done">
+      <div class="tick">✓</div>
+      <h2>Message received</h2>
+      <p>Thank you. Your reference is <b id="ref"></b>. We have emailed you a copy, and a member of the team will reply personally.</p>
+    </div>
+    <div class="alt"><a href="/">Back to Chartavia</a></div>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    if (new URLSearchParams(location.search).get('topic') === 'operator') $('topic').value = 'operator';
+    $('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = $('msg'), btn = $('submit');
+      msg.style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/concierge', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: $('name').value, email: $('email').value, phone: $('phone').value, topic: $('topic').value, message: $('message').value, website: $('website').value }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Something went wrong');
+        $('ref').textContent = data.ref || '';
+        $('formWrap').style.display = 'none';
+        $('done').style.display = 'block';
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Send to the concierge';
+      }
+    });
+  </script>
+</body>
+</html>

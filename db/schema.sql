@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   org_id INTEGER,                     -- operators: the team's admin user id (self for admins)
   org_role TEXT,                      -- operators: 'admin' | 'member'
   session_epoch INTEGER NOT NULL DEFAULT 0,  -- bump to invalidate all sessions (password change)
+  is_staff INTEGER NOT NULL DEFAULT 0,       -- Chartavia team: sees the concierge desk and any trip document
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -119,6 +120,25 @@ CREATE TABLE IF NOT EXISTS reviews (
   text TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Concierge: messages from the public /concierge page (user_id null) or the
+-- in-app dialog. Staff work them from the concierge desk.
+CREATE TABLE IF NOT EXISTS concierge_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT NOT NULL DEFAULT '',
+  topic TEXT NOT NULL DEFAULT 'general',  -- trip | operator | general
+  request_id TEXT,                        -- the trip being discussed, if any
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new',     -- new | open | closed
+  note TEXT NOT NULL DEFAULT '',          -- staff-only
+  handled_by INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_concierge_status ON concierge_requests(status, created_at);
 
 -- Fixed-window auth rate limiting (8/min per key); rows self-clean.
 CREATE TABLE IF NOT EXISTS rate_limits (

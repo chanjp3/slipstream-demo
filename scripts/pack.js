@@ -1098,6 +1098,112 @@ const LUX_COPY = [
 ];
 for (const [from, to] of LUX_COPY) newTemplate = newTemplate.split(from).join(to);
 
+// Concierge, staff desk, partner card and trip-document links. Runs after the
+// luxury copy pass because it anchors on that pass's request-screen sentence.
+const CON_LINK = '<button sc-camel-on-click="{{ openConciergeTrip }}" style="margin:-8px 0 18px;border:none;background:none;cursor:pointer;padding:0;font-size:12.5px;font-weight:700;color:#8a6b2e;display:flex;align-items:center;gap:8px"><span style="width:22px;height:1px;background:#c6a667;display:inline-block"></span>Prefer to talk it through? Talk to a charter specialist</button>';
+const CON_PARTNER = `<div style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:#8593ab;padding:18px 6px 10px">PARTNER DESK</div>
+      <div style="border:1.5px solid #e3e9f2;border-radius:12px;padding:12px;background:#fff;display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:50%;background:#16233b;color:#dcc48f;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none">{{ partnerInitials }}</div>
+        <div style="min-width:0;flex:1"><div style="font-size:12.5px;font-weight:800;color:#16233b">{{ partnerName }}</div><div style="font-size:11px;color:#68758d">{{ partnerTitle }}</div></div>
+        <button sc-camel-on-click="{{ openConciergeOp }}" style="border:none;cursor:pointer;background:#16233b;color:#fff;border-radius:8px;padding:7px 11px;font-size:11.5px;font-weight:800">Message</button>
+      </div>
+      `;
+const CON_NAV = `<sc-if value="{{ isStaff }}" hint-placeholder-val="{{ false }}">
+        <button sc-camel-on-click="{{ goStaff }}" style="display:flex;align-items:center;gap:7px;border:none;cursor:pointer;padding:8px 14px;border-radius:8px;font-size:13.5px;font-weight:600;background:{{ navStaffBg }};color:{{ navStaffFg }}">Concierge desk
+          <span style="background:#c6a667;color:#16233b;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px">{{ staffNewCount }}</span>
+        </button>
+      </sc-if>
+    `;
+const CON_STAFF_SCREEN = `<sc-if value="{{ showStaff }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Staff — Concierge desk" style="flex:1;overflow-y:auto;padding:24px 28px 60px;min-height:0">
+    <div style="max-width:860px;margin:0 auto">
+      <h1 style="margin:0;font-size:22px;font-weight:800;color:#16233b">Concierge desk</h1>
+      <div style="color:#68758d;font-size:13.5px;margin-top:4px">Messages from travelers, operators and the public page. Reply by email or phone, then mark them handled.</div>
+      <sc-if value="{{ staffEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:20px;background:#fff;border:1.5px dashed #dde5f0;border-radius:14px;padding:22px;font-size:13px;color:#68758d;text-align:center">No messages yet.</div>
+      </sc-if>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
+      <sc-for list="{{ staffRows }}" as="c" hint-placeholder-count="2">
+        <div style="background:#fff;border:1.5px solid {{ c.bd }};border-radius:14px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:800;color:#16233b">{{ c.ref }}</span>
+              <span style="font-size:14px;font-weight:800;color:#16233b">{{ c.name }}</span>
+              <span style="font-size:10px;font-weight:800;letter-spacing:.6px;padding:2px 8px;border-radius:999px;background:#eef2f8;color:#4a5a76">{{ c.topicLabel }}</span>
+            </div>
+            <span style="font-size:10px;font-weight:800;letter-spacing:.6px;padding:3px 9px;border-radius:999px;background:{{ c.stBg }};color:{{ c.stFg }}">{{ c.stLabel }}</span>
+          </div>
+          <div style="font-size:12px;color:#68758d;margin-top:4px">{{ c.meta }}</div>
+          <div style="font-size:13.5px;color:#4a5a76;line-height:1.6;margin-top:10px;white-space:pre-wrap">{{ c.message }}</div>
+          <sc-if value="{{ c.note }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:10px;padding:9px 12px;background:#fbf9f5;border-left:3px solid #c6a667;font-size:12.5px;color:#4a5a76">{{ c.note }}</div>
+          </sc-if>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <a href="{{ c.mailHref }}" style="background:#2E6BE6;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800;text-decoration:none">Reply by email</a>
+            <sc-if value="{{ c.canOpen }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ c.onOpen }}" style="border:1.5px solid #dde5f0;cursor:pointer;background:#fff;color:#16233b;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700">Mark in progress</button></sc-if>
+            <sc-if value="{{ c.canClose }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ c.onClose }}" style="border:none;cursor:pointer;background:#16233b;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800">Mark handled</button></sc-if>
+            <sc-if value="{{ c.canReopen }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ c.onReopen }}" style="border:1.5px solid #dde5f0;cursor:pointer;background:#fff;color:#68758d;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700">Reopen</button></sc-if>
+          </div>
+        </div>
+      </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+`;
+const CON_MODAL = `<sc-if value="{{ conOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;background:rgba(10,20,40,.55);display:flex;align-items:center;justify-content:center;z-index:3000;padding:16px">
+  <div style="background:#fff;border-radius:18px;border-top:2px solid #c6a667;padding:26px 28px;width:100%;max-width:460px;box-sizing:border-box;box-shadow:0 30px 80px rgba(10,20,40,.4)">
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:2px;color:#8a6b2e">CONCIERGE</div>
+    <div style="font-size:20px;font-weight:800;color:#16233b;margin-top:6px">{{ conTitle }}</div>
+    <sc-if value="{{ conDone }}" hint-placeholder-val="{{ false }}">
+      <div style="font-size:13.5px;color:#4a5a76;line-height:1.6;margin-top:10px">{{ conDone }}</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px"><button sc-camel-on-click="{{ closeConcierge }}" style="border:none;cursor:pointer;background:#16233b;color:#fff;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:800">Done</button></div>
+    </sc-if>
+    <sc-if value="{{ conForm }}" hint-placeholder-val="{{ true }}">
+      <div style="font-size:13px;color:#68758d;line-height:1.55;margin-top:6px">{{ conIntro }}</div>
+      <sc-if value="{{ conContext }}" hint-placeholder-val="{{ false }}">
+        <div style="display:inline-block;margin-top:10px;font-size:11px;font-weight:800;letter-spacing:.5px;padding:3px 10px;border-radius:999px;background:#eef2f8;color:#4a5a76">{{ conContext }}</div>
+      </sc-if>
+      <textarea value="{{ conMsg }}" sc-camel-on-change="{{ onConMsg }}" rows="5" placeholder="Route, dates, passengers, anything unusual." style="width:100%;box-sizing:border-box;margin-top:12px;border:1.5px solid #dde5f0;border-radius:10px;padding:10px 11px;font-size:13.5px;line-height:1.5;resize:vertical;background:#fff;color:#16233b"></textarea>
+      <input value="{{ conPhone }}" sc-camel-on-change="{{ onConPhone }}" placeholder="Phone, if you would like a call (optional)" style="width:100%;box-sizing:border-box;margin-top:8px;border:1.5px solid #dde5f0;border-radius:10px;padding:10px 11px;font-size:13.5px;color:#16233b">
+      <sc-if value="{{ conErr }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px;background:#fdecec;color:#b3261e;border-radius:8px;padding:9px 12px;font-size:12.5px;font-weight:600">{{ conErr }}</div>
+      </sc-if>
+      <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+        <button sc-camel-on-click="{{ closeConcierge }}" style="border:1.5px solid #dde5f0;cursor:pointer;background:#fff;color:#68758d;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700">Cancel</button>
+        <button sc-camel-on-click="{{ sendConcierge }}" style="border:none;cursor:pointer;background:#2E6BE6;color:#fff;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:800">{{ conSendLabel }}</button>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+  `;
+if (!newTemplate.includes('{{ openConciergeTrip }}')) {
+  const CON_EDITS = [
+    ["none of them sees another's price.</p>", "none of them sees another's price.</p>\n      " + CON_LINK],
+    ['{{ bannerText }} <sc-if value="{{ clientCanCancel }}"', '{{ bannerText }} <a href="{{ tripDocUrl }}" target="_blank" style="margin-left:4px;color:#1e5e3c;font-weight:800;text-decoration:underline">{{ tripDocLabel }}</a> <sc-if value="{{ clientCanCancel }}"'],
+    ['<div style="font-size:12px;color:#4a5a76;font-weight:600;margin-bottom:7px">{{ tripStatusLabel }}</div>',
+      '<div style="font-size:12px;color:#4a5a76;font-weight:600;margin-bottom:7px">{{ tripStatusLabel }} <a href="{{ opTripDocUrl }}" target="_blank" style="margin-left:4px;color:#2E6BE6;font-weight:800;text-decoration:underline">Trip sheet</a></div>'],
+    ['<div style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:#8593ab;padding:18px 6px 10px">MY EMPTY LEGS</div>',
+      CON_PARTNER + '<div style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:#8593ab;padding:18px 6px 10px">MY EMPTY LEGS</div>'],
+    ['<sc-if value="{{ showOpStats }}"', CON_STAFF_SCREEN + '<sc-if value="{{ showOpStats }}"'],
+    ['<sc-if value="{{ checkoutOpen }}"', CON_MODAL + '<sc-if value="{{ checkoutOpen }}"'],
+  ];
+  for (const [from, to] of CON_EDITS) {
+    if (!newTemplate.includes(from)) throw new Error('concierge anchor not found: ' + from.slice(0, 70));
+    // every occurrence: the chat drawer exists twice (client and operator copies)
+    newTemplate = newTemplate.split(from).join(to);
+  }
+  const closeBtn = /(\{\{ closeLabel \}\}<\/button>\s*<\/sc-if>)/;
+  const navEnd = /(<\/sc-if>\s*)(<\/nav>)/;
+  if (!closeBtn.test(newTemplate) || !navEnd.test(newTemplate)) throw new Error('concierge regex anchors not found — template changed?');
+  newTemplate = newTemplate
+    .replace(closeBtn, (m) => m + '\n        <button sc-camel-on-click="{{ openConciergeReq }}" style="margin-top:14px;margin-left:8px;border:1.5px solid #e6dcc3;cursor:pointer;background:#fff;color:#8a6b2e;border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:700">Ask a specialist</button>')
+    .replace(navEnd, (m, a, b) => a + CON_NAV + b);
+  console.log('applied concierge + staff desk markup patch');
+}
+
 // Brand type: Quicksand for display text (headings, buttons, anything set
 // bold); Albert Sans stays for running text and inputs. The framework
 // re-serializes inline styles at runtime, hence the spaced "font-weight: 800".

@@ -45,7 +45,9 @@ class Component extends DCLogic {
       legAircraft: 'xls', legPrice: '', legNote: '', legMsg: '',
       depOpen: false, depAmount: 0,
       apOpen: false, mapOpen: false,
-      opView: 'desk', expEdits: {}, expMsg: ''
+      opView: 'desk', expEdits: {}, expMsg: '',
+      conOpen: false, conTopic: 'trip', conReqId: null, conMsg: '', conPhone: '', conBusy: false, conDone: '', conErr: '',
+      staffOpen: false
     };
     this.opStats = null;
     this.DEPOSIT_TIERS = { prop: 150, light: 150, mid: 250, smid: 250, heavy: 500, ulr: 500 };
@@ -124,6 +126,8 @@ class Component extends DCLogic {
   loadData() {
     return this.api('/api/bootstrap').then(d => {
       this.me = d.me;
+      this.desk = d.concierge || null;
+      this.partner = d.partner || null;
       const initials = (d.me.name || '??').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
       if (!this.state.menuOpen) {
         this.setState({
@@ -472,6 +476,24 @@ class Component extends DCLogic {
       .catch(e => this.setState({ prMsg: e.message }))
       .then(() => { this._d085ing = false; });
   }
+  openConcierge(topic, reqId) {
+    this.setState({ conOpen: true, conTopic: topic, conReqId: reqId || null, conMsg: '', conErr: '', conDone: '', menuOpen: false });
+  }
+  sendConcierge() {
+    const s = this.state;
+    if (s.conBusy) return;
+    if (s.conMsg.trim().length < 10) { this.setState({ conErr: 'Add a few words about what you need.' }); return; }
+    this.setState({ conBusy: true, conErr: '' });
+    this.api('/api/concierge', { body: { topic: s.conTopic, requestId: s.conReqId, phone: s.conPhone, message: s.conMsg } })
+      .then(d => this.setState({ conBusy: false, conDone: d.ref || 'sent' }))
+      .catch(e => this.setState({ conBusy: false, conErr: e.message || 'Could not send. Try again.' }));
+  }
+  staffSet(id, status) {
+    this.api('/api/staff/concierge/' + id, { body: { status } })
+      .then(d => { this.desk = d.desk; this.setState({ staffTick: Date.now() }); })
+      .catch(() => {});
+  }
+
   saveExpenses(quoteId) {
     const raw = this.state.expEdits[quoteId];
     const amount = Math.round(+String(raw ?? '').replace(/[^0-9.]/g, ''));
@@ -730,25 +752,25 @@ class Component extends DCLogic {
       roleOperator: () => { if (realRole === 'operator') this.setState({ role: 'operator', view: 'operator', chatWith: null }); },
       roleCliBg: segDark(s.role === 'client').bg, roleCliFg: segDark(s.role === 'client').fg, roleCliSh: segDark(s.role === 'client').sh,
       roleOpBg: segDark(s.role === 'operator').bg, roleOpFg: segDark(s.role === 'operator').fg, roleOpSh: segDark(s.role === 'operator').sh,
-      goRequest: () => this.setState({ view: 'request', chatWith: null }),
-      goQuotes: () => this.setState({ view: 'quotes' }),
-      goDeals: () => this.setState({ view: 'deals', chatWith: null }),
-      navReqBg: s.view === 'request' ? 'rgba(255,255,255,.13)' : 'transparent', navReqFg: s.view === 'request' ? '#ffffff' : '#b7c4dc',
-      navQuoBg: s.view === 'quotes' ? 'rgba(255,255,255,.13)' : 'transparent', navQuoFg: s.view === 'quotes' ? '#ffffff' : '#b7c4dc',
-      navDealBg: s.view === 'deals' ? 'rgba(255,255,255,.13)' : 'transparent', navDealFg: s.view === 'deals' ? '#ffffff' : '#b7c4dc',
+      goRequest: () => this.setState({ view: 'request', chatWith: null, staffOpen: false }),
+      goQuotes: () => this.setState({ view: 'quotes', staffOpen: false }),
+      goDeals: () => this.setState({ view: 'deals', chatWith: null, staffOpen: false }),
+      navReqBg: !s.staffOpen && s.view === 'request' ? 'rgba(255,255,255,.13)' : 'transparent', navReqFg: !s.staffOpen && s.view === 'request' ? '#ffffff' : '#b7c4dc',
+      navQuoBg: !s.staffOpen && s.view === 'quotes' ? 'rgba(255,255,255,.13)' : 'transparent', navQuoFg: !s.staffOpen && s.view === 'quotes' ? '#ffffff' : '#b7c4dc',
+      navDealBg: !s.staffOpen && s.view === 'deals' ? 'rgba(255,255,255,.13)' : 'transparent', navDealFg: !s.staffOpen && s.view === 'deals' ? '#ffffff' : '#b7c4dc',
       myRequestCount: s.requests.length, openRfqCount: s.marketplace.length,
       dealCount: s.emptyLegs.length,
-      showRequest: s.role === 'client' && s.view === 'request',
-      showQuotes: s.role === 'client' && s.view === 'quotes',
-      showDeals: s.role === 'client' && s.view === 'deals',
-      showOperator: s.role === 'operator' && s.opView !== 'stats',
-      showOpStats: s.role === 'operator' && s.opView === 'stats',
+      showRequest: !s.staffOpen && s.role === 'client' && s.view === 'request',
+      showQuotes: !s.staffOpen && s.role === 'client' && s.view === 'quotes',
+      showDeals: !s.staffOpen && s.role === 'client' && s.view === 'deals',
+      showOperator: !s.staffOpen && s.role === 'operator' && s.opView !== 'stats',
+      showOpStats: !s.staffOpen && s.role === 'operator' && s.opView === 'stats',
 
       // operator nav + analytics
-      goDesk: () => this.setState({ opView: 'desk', chatWith: null }),
-      goStats: () => this.setState({ opView: 'stats', chatWith: null, expMsg: '' }),
-      navDeskBg: s.opView !== 'stats' ? 'rgba(255,255,255,.13)' : 'transparent', navDeskFg: s.opView !== 'stats' ? '#ffffff' : '#b7c4dc',
-      navStatBg: s.opView === 'stats' ? 'rgba(255,255,255,.13)' : 'transparent', navStatFg: s.opView === 'stats' ? '#ffffff' : '#b7c4dc',
+      goDesk: () => this.setState({ opView: 'desk', chatWith: null, staffOpen: false }),
+      goStats: () => this.setState({ opView: 'stats', chatWith: null, expMsg: '', staffOpen: false }),
+      navDeskBg: !s.staffOpen && s.opView !== 'stats' ? 'rgba(255,255,255,.13)' : 'transparent', navDeskFg: !s.staffOpen && s.opView !== 'stats' ? '#ffffff' : '#b7c4dc',
+      navStatBg: !s.staffOpen && s.opView === 'stats' ? 'rgba(255,255,255,.13)' : 'transparent', navStatFg: !s.staffOpen && s.opView === 'stats' ? '#ffffff' : '#b7c4dc',
       ...(() => {
         const a = this.opStats;
         if (!a) return { stTiles: [], tripRows: [], hasTrips: false, noTrips: true, memberRows: [], showMembers: false, expNote: false, expMsg: false };
@@ -961,6 +983,50 @@ class Component extends DCLogic {
         };
       })(),
       hasAccepted: !!acceptedQuote,
+      tripDocUrl: acceptedQuote && activeReq ? '/trip/' + activeReq.id : '',
+      tripDocLabel: activeReq && activeReq.tripStatus === 'confirmed' ? 'Trip confirmation' : activeReq && activeReq.tripStatus === 'completed' ? 'Trip record' : 'Trip summary',
+      opTripDocUrl: inboxChat && inboxChat.won ? '/trip/' + inboxChat.requestId : '',
+
+      // concierge (any role) and the staff desk (team accounts only)
+      conOpen: s.conOpen,
+      conTitle: s.conTopic === 'operator' ? 'Message your partner manager' : 'Talk to a charter specialist',
+      conIntro: s.conTopic === 'operator'
+        ? 'Onboarding, verification, a request that looks off: tell us and a person on the Chartavia team replies.'
+        : 'Not sure which cabin you need, or planning something unusual? A person on the Chartavia team reads this and replies by email or phone.',
+      conContext: s.conReqId ? 'About trip ' + s.conReqId : false,
+      conForm: !s.conDone,
+      conDone: s.conDone ? 'Message received. Your reference is ' + s.conDone + '. We have emailed you a copy and will reply personally.' : false,
+      conMsg: s.conMsg, onConMsg: e => this.setState({ conMsg: e.target.value, conErr: '' }),
+      conPhone: s.conPhone, onConPhone: e => this.setState({ conPhone: e.target.value }),
+      conErr: s.conErr || false,
+      conSendLabel: s.conBusy ? 'Sending…' : 'Send to the concierge',
+      sendConcierge: () => this.sendConcierge(),
+      closeConcierge: () => this.setState({ conOpen: false }),
+      openConciergeTrip: () => this.openConcierge('trip', null),
+      openConciergeReq: () => this.openConcierge('trip', activeReq ? activeReq.id : null),
+      openConciergeOp: () => this.openConcierge('operator', null),
+      partnerName: this.partner ? this.partner.name : 'Chartavia Partner Desk',
+      partnerTitle: this.partner ? this.partner.title : 'Operator partnerships',
+      partnerInitials: (this.partner ? this.partner.name : 'Chartavia Partner').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+
+      isStaff: !!(this.me && this.me.isStaff),
+      showStaff: !!s.staffOpen,
+      goStaff: () => this.setState({ staffOpen: true, chatWith: null, menuOpen: false }),
+      navStaffBg: s.staffOpen ? 'rgba(255,255,255,.13)' : 'transparent', navStaffFg: s.staffOpen ? '#ffffff' : '#b7c4dc',
+      staffNewCount: this.desk ? this.desk.newCount : 0,
+      staffEmpty: !this.desk || !this.desk.items.length,
+      staffRows: (this.desk ? this.desk.items : []).map(c => {
+        const st = c.status === 'new' ? { stLabel: 'NEW', stBg: '#c6a667', stFg: '#16233b', bd: '#c6a667' }
+          : c.status === 'open' ? { stLabel: 'IN PROGRESS', stBg: '#eef3fd', stFg: '#2E6BE6', bd: '#e3e9f2' }
+          : { stLabel: 'HANDLED', stBg: '#eef2f8', stFg: '#68758d', bd: '#e3e9f2' };
+        return {
+          ...st, ref: c.ref, name: c.name, topicLabel: c.topicLabel.toUpperCase(), message: c.message, note: c.note || false,
+          meta: [c.email, c.phone, c.member ? (c.member === 'operator' ? 'Operator account' : 'Traveler account') : 'Public page', c.requestId, c.ago].filter(Boolean).join(' · '),
+          mailHref: 'mailto:' + c.email + '?subject=' + encodeURIComponent('Your Chartavia enquiry (' + c.ref + ')'),
+          canOpen: c.status === 'new', canClose: c.status !== 'closed', canReopen: c.status === 'closed',
+          onOpen: () => this.staffSet(c.id, 'open'), onClose: () => this.staffSet(c.id, 'closed'), onReopen: () => this.staffSet(c.id, 'open'),
+        };
+      }),
       ...(() => {
         if (!acceptedQuote || !activeReq) return { bannerText: '', clientCanCancel: false, canReview: false };
         const base = acceptedQuote.op + ' · ' + acceptedQuote.aircraft + ' · ' + this.fmtPrice(acceptedQuote.price)

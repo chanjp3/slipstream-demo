@@ -4,6 +4,7 @@
 /login https://slipstream.chandler-850.workers.dev/login 302
 /register https://slipstream.chandler-850.workers.dev/register 302
 /app https://slipstream.chandler-850.workers.dev/app 302
+/concierge https://slipstream.chandler-850.workers.dev/concierge 302
 # Source and config files aren't part of the public site.
 /src/* / 302
 /db/* / 302
