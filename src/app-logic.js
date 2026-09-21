@@ -54,6 +54,62 @@ class Component extends DCLogic {
   ap(code) { return this.airports ? this.airports.find(a => a.iata === code) : null; }
   fmtDate(d) { const dt = new Date(d + 'T12:00'); return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
   fmtPrice(p) { return '$' + p.toLocaleString('en-US'); }
+
+  // Cabin class for the quote-card art, from the model name first (operators
+  // type free text) and the seat count as a fallback.
+  acClass(name, seats) {
+    const m = (name || '').toLowerCase();
+    if (/king air|pc-?12|tbm|caravan|kodiak|avanti|cheyenne|conquest|meridian|m[56]00|turboprop/.test(m)) return 'prop';
+    if (/challenger 3|sovereign|latitude|longitude|xls|excel|citation x|hawker|praetor|legacy [45]|g280|g200|learjet 6|falcon 50/.test(m)) return 'mid';
+    if (/gulfstream|\bg[2-7]\d0|global|falcon (7|8|9|2000)|challenger (6|8)|legacy 6|lineage|bbj|acj/.test(m)) return 'heavy';
+    if (/phenom|cj\d|citation m2|mustang|bravo|encore|learjet [347]|hondajet|eclipse|premier|beechjet|nextant|pc-?24|sf50|vision/.test(m)) return 'light';
+    const s = parseInt(seats, 10) || 0;
+    return s >= 12 ? 'heavy' : s >= 8 ? 'mid' : 'light';
+  }
+
+  // Side-profile silhouette on navy, shown until the operator uploads a photo.
+  // Returned as a data URI so the template can bind it to an <img>.
+  acArt(kind) {
+    this._art = this._art || {};
+    if (this._art[kind]) return this._art[kind];
+    const NAVY = '#16233B', BODY = '#F3EEE3', SHADE = '#DDD5C4';
+    const spec = { prop: { L: 236, D: 34, win: 5, prop: true }, light: { L: 256, D: 30, win: 5 }, mid: { L: 300, D: 33, win: 7 }, heavy: { L: 348, D: 37, win: 9 } }[kind];
+    const { L, D, win } = spec;
+    const r1 = v => Math.round(v * 10) / 10;
+    const W = 440, H = 280, cy = 146, x0 = (W - L) / 2, yt = cy - D / 2, yb = cy + D / 2, fin = 1.55 * D;
+    const X = f => r1(x0 + f * L), Y = f => r1(cy + f * D);
+    const fuselage = 'M' + X(0) + ',' + Y(-0.3) + ' L' + X(0.18) + ',' + r1(yt) + ' L' + X(0.78) + ',' + r1(yt)
+      + ' C' + X(0.88) + ',' + r1(yt) + ' ' + X(0.95) + ',' + Y(-0.12) + ' ' + X(1) + ',' + Y(0.14)
+      + ' C' + X(0.96) + ',' + Y(0.42) + ' ' + X(0.9) + ',' + r1(yb) + ' ' + X(0.84) + ',' + r1(yb)
+      + ' L' + X(0.42) + ',' + r1(yb) + ' C' + X(0.25) + ',' + r1(yb) + ' ' + X(0.1) + ',' + Y(0.05) + ' ' + X(0) + ',' + Y(-0.16) + ' Z';
+    const sy = r1(yt - fin - 1);
+    let parts = '<polygon points="' + [X(0.25) + ',' + r1(yt + 3), X(0.06) + ',' + r1(yt + 3), X(-0.04) + ',' + r1(yt - fin), X(0.075) + ',' + r1(yt - fin)].join(' ') + '" fill="' + BODY + '"/>'
+      + '<path d="M' + X(-0.09) + ',' + sy + ' Q' + X(0.01) + ',' + r1(sy - 6) + ' ' + X(0.12) + ',' + sy + ' Q' + X(0.01) + ',' + r1(sy + 5) + ' ' + X(-0.09) + ',' + sy + ' Z" fill="' + BODY + '"/>'
+      + '<path d="' + fuselage + '" fill="' + BODY + '"/>'
+      + '<polygon points="' + [X(0.64) + ',' + r1(yb - 5), X(0.5) + ',' + r1(yb - 3), X(0.355) + ',' + r1(yb + 21), X(0.4) + ',' + r1(yb + 21)].join(' ') + '" fill="' + SHADE + '"/>'
+      + '<polygon points="' + [X(0.355) + ',' + r1(yb + 21), X(0.325) + ',' + r1(yb + 1), X(0.34) + ',' + r1(yb + 1), X(0.385) + ',' + r1(yb + 21)].join(' ') + '" fill="' + SHADE + '"/>';
+    if (spec.prop) {
+      const ny = r1(yb - 1), a = X(0.5), b = X(0.73);
+      parts += '<rect x="' + a + '" y="' + r1(ny - 8) + '" width="' + r1(b - a) + '" height="16" rx="8" fill="' + SHADE + '" stroke="' + NAVY + '" stroke-width="2"/>'
+        + '<path d="M' + b + ',' + r1(ny - 5) + ' L' + r1(b + 9) + ',' + ny + ' L' + b + ',' + r1(ny + 5) + ' Z" fill="' + SHADE + '"/>'
+        + '<ellipse cx="' + r1(b + 4) + '" cy="' + ny + '" rx="2.2" ry="' + r1(D * 0.95) + '" fill="' + BODY + '" opacity=".85"/>';
+    } else {
+      const eh = r1(D * 0.62);
+      parts += '<rect x="' + X(0.2) + '" y="' + r1(yt - eh * 0.45) + '" width="' + r1(0.18 * L) + '" height="' + eh + '" rx="' + r1(eh / 2) + '" fill="' + SHADE + '" stroke="' + NAVY + '" stroke-width="2"/>';
+    }
+    const wa = x0 + 0.4 * L, wb = x0 + 0.74 * L;
+    for (let i = 0; i < win; i++) {
+      const wx = wa + ((wb - wa) * i) / (win - 1);
+      parts += spec.prop
+        ? '<circle cx="' + r1(wx) + '" cy="' + Y(-0.16) + '" r="4.6" fill="' + NAVY + '"/>'
+        : '<rect x="' + r1(wx - 4.5) + '" y="' + Y(-0.36) + '" width="9" height="12" rx="4.2" fill="' + NAVY + '"/>';
+    }
+    parts += '<polygon points="' + [X(0.8) + ',' + r1(yt + 4), X(0.865) + ',' + Y(-0.2), X(0.9) + ',' + Y(0), X(0.81) + ',' + Y(-0.04)].join(' ') + '" fill="' + NAVY + '"/>';
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid slice">'
+      + '<rect width="' + W + '" height="' + H + '" fill="' + NAVY + '"/>'
+      + '<line x1="56" y1="212" x2="384" y2="212" stroke="#C6A667" stroke-width="1.5" opacity=".6"/>' + parts + '</svg>';
+    return (this._art[kind] = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg));
+  }
   routeStr(r) { const codes = [r.legs[0].from, ...r.legs.map(l => l.to)]; if (r.type === 'round') return r.legs[0].from + ' ⇄ ' + r.legs[0].to; return codes.join(' → '); }
 
   api(path, opts) {
@@ -454,6 +510,7 @@ class Component extends DCLogic {
     if (!this.airports && window.AIRPORTS) this.airports = window.AIRPORTS.map(r => ({ iata: r[0], name: r[1], city: r[2], cc: r[3], lat: r[4], lon: r[5], tier: r[6] }));
     const apName = c => { const a = this.ap(c); return a ? a.name : ''; };
     const seg = on => on ? { bg: '#ffffff', fg: '#16233b', sh: '0 1px 3px rgba(22,35,59,.14)' } : { bg: 'transparent', fg: '#68758d', sh: 'none' };
+    const segDark = on => on ? seg(true) : { bg: 'transparent', fg: '#b7c4dc', sh: 'none' }; // role toggle sits on the navy header
 
     const legsView = s.legs.map((l, i) => {
       const isActive = side => s.active.leg === i && s.active.side === side;
@@ -671,14 +728,14 @@ class Component extends DCLogic {
       coCancel: () => this.setState({ checkoutOpen: false }),
       roleClient: () => { if (realRole === 'client') this.setState({ role: 'client', view: s.view === 'operator' ? 'request' : s.view, chatWith: null }); },
       roleOperator: () => { if (realRole === 'operator') this.setState({ role: 'operator', view: 'operator', chatWith: null }); },
-      roleCliBg: seg(s.role === 'client').bg, roleCliFg: seg(s.role === 'client').fg, roleCliSh: seg(s.role === 'client').sh,
-      roleOpBg: seg(s.role === 'operator').bg, roleOpFg: seg(s.role === 'operator').fg, roleOpSh: seg(s.role === 'operator').sh,
+      roleCliBg: segDark(s.role === 'client').bg, roleCliFg: segDark(s.role === 'client').fg, roleCliSh: segDark(s.role === 'client').sh,
+      roleOpBg: segDark(s.role === 'operator').bg, roleOpFg: segDark(s.role === 'operator').fg, roleOpSh: segDark(s.role === 'operator').sh,
       goRequest: () => this.setState({ view: 'request', chatWith: null }),
       goQuotes: () => this.setState({ view: 'quotes' }),
       goDeals: () => this.setState({ view: 'deals', chatWith: null }),
-      navReqBg: s.view === 'request' ? '#eef2f8' : 'transparent', navReqFg: s.view === 'request' ? '#16233b' : '#68758d',
-      navQuoBg: s.view === 'quotes' ? '#eef2f8' : 'transparent', navQuoFg: s.view === 'quotes' ? '#16233b' : '#68758d',
-      navDealBg: s.view === 'deals' ? '#eef2f8' : 'transparent', navDealFg: s.view === 'deals' ? '#16233b' : '#68758d',
+      navReqBg: s.view === 'request' ? 'rgba(255,255,255,.13)' : 'transparent', navReqFg: s.view === 'request' ? '#ffffff' : '#b7c4dc',
+      navQuoBg: s.view === 'quotes' ? 'rgba(255,255,255,.13)' : 'transparent', navQuoFg: s.view === 'quotes' ? '#ffffff' : '#b7c4dc',
+      navDealBg: s.view === 'deals' ? 'rgba(255,255,255,.13)' : 'transparent', navDealFg: s.view === 'deals' ? '#ffffff' : '#b7c4dc',
       myRequestCount: s.requests.length, openRfqCount: s.marketplace.length,
       dealCount: s.emptyLegs.length,
       showRequest: s.role === 'client' && s.view === 'request',
@@ -690,8 +747,8 @@ class Component extends DCLogic {
       // operator nav + analytics
       goDesk: () => this.setState({ opView: 'desk', chatWith: null }),
       goStats: () => this.setState({ opView: 'stats', chatWith: null, expMsg: '' }),
-      navDeskBg: s.opView !== 'stats' ? '#eef2f8' : 'transparent', navDeskFg: s.opView !== 'stats' ? '#16233b' : '#68758d',
-      navStatBg: s.opView === 'stats' ? '#eef2f8' : 'transparent', navStatFg: s.opView === 'stats' ? '#16233b' : '#68758d',
+      navDeskBg: s.opView !== 'stats' ? 'rgba(255,255,255,.13)' : 'transparent', navDeskFg: s.opView !== 'stats' ? '#ffffff' : '#b7c4dc',
+      navStatBg: s.opView === 'stats' ? 'rgba(255,255,255,.13)' : 'transparent', navStatFg: s.opView === 'stats' ? '#ffffff' : '#b7c4dc',
       ...(() => {
         const a = this.opStats;
         if (!a) return { stTiles: [], tripRows: [], hasTrips: false, noTrips: true, memberRows: [], showMembers: false, expNote: false, expMsg: false };
@@ -859,7 +916,7 @@ class Component extends DCLogic {
               ? { status: 'REFUNDED', statusBg: '#eef2f8', statusFg: '#68758d' }
               : { status: 'CLOSED', statusBg: '#eef2f8', statusFg: '#68758d' })
           : r.status === 'collecting' ? { status: 'COLLECTING', statusBg: '#fdf6e3', statusFg: '#8a6d1f' }
-          : { status: r.quotes.length + ' QUOTES', statusBg: '#eef3fd', statusFg: '#2E6BE6' };
+          : { status: r.quotes.length + (r.quotes.length === 1 ? ' OFFER' : ' OFFERS'), statusBg: '#eef3fd', statusFg: '#2E6BE6' };
         return {
           route: this.routeStr(r), ...st,
           sub: this.fmtDate(r.legs[0].date) + ' · ' + r.pax + ' pax · posted ' + r.posted,
@@ -914,7 +971,7 @@ class Component extends DCLogic {
         const bannerText = ts === 'confirmed' ? 'Trip confirmed. ' + base + ' — your aircraft is locked in.'
           : ts === 'completed' ? 'Trip completed. ' + base + ' — how was it? Leave a review below.'
           : ts === 'cancelled' ? 'Trip cancelled. ' + base
-          : 'Quote accepted. ' + base + ' — message the operator to finalize contract & payment.';
+          : 'Offer accepted. ' + base + ' — message the operator to finalize contract & payment.';
         return {
           bannerText,
           clientCanCancel: ts === 'accepted' || ts === 'confirmed',
@@ -936,7 +993,10 @@ class Component extends DCLogic {
         const isAcc = acceptedId === q.id;
         return {
           op: q.op, safety: q.safety, photo: q.photo || false,
+          art: this.acArt(this.acClass(q.aircraft, q.seats)),
+          artLabel: { prop: 'TURBOPROP', light: 'LIGHT CABIN', mid: 'MID CABIN', heavy: 'LARGE CABIN' }[this.acClass(q.aircraft, q.seats)],
           aircraft: q.aircraft, year: q.year, seats: q.seats,
+          spec: [q.aircraft, parseInt(q.seats, 10) ? q.seats + ' seats' : '', q.year].filter(Boolean).join(' · '),
           rating: q.rating, reviews: q.reviews, resp: q.resp, valid: q.valid,
           price: this.fmtPrice(q.price), emptyLeg: q.emptyLeg, discount: q.discount || '', note: q.note || false,
           bd: isAcc ? '#38a169' : inCmp ? '#2E6BE6' : '#e3e9f2',
@@ -947,7 +1007,7 @@ class Component extends DCLogic {
           onChat: () => { this.setState({ chatWith: q.id, ctMsg: '', chats: s.chats[q.id] ? s.chats : { ...s.chats, [q.id]: [] } }); this.loadChat(q.id); },
           acceptBg: isAcc ? '#38a169' : acceptedId ? '#eef2f8' : '#16233b',
           acceptFg: isAcc ? '#fff' : acceptedId ? '#a9b4c8' : '#fff',
-          acceptLabel: isAcc ? '✓ Accepted' : 'Accept quote',
+          acceptLabel: isAcc ? '✓ Accepted' : 'Accept offer',
           onAccept: () => { if (!acceptedId) this.acceptQuote(activeReq.id, q.id); }
         };
       }),

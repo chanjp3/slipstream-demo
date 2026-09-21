@@ -1047,6 +1047,57 @@ if (!newTemplate.includes('{{ checkoutOpen }}')) {
   console.log('applied checkout-modal markup patch');
 }
 
+// Luxury pass: navy header with a champagne rule, aircraft art in place of the
+// hatched photo placeholder (bound to q.art from app-logic.js), larger photos,
+// and client-facing wording (offers and trips; operators still quote).
+const LUX_EDITS = [
+  ['padding:0 20px;background:#ffffff;border-bottom:1px solid #e3e9f2;flex:none;z-index:1200',
+    'padding:0 20px;background:#16233b;border-bottom:1px solid rgba(198,166,103,.5);flex:none;z-index:1200'],
+  ['<div style="color:#16233b;margin-bottom:4px">', '<div style="color:#ffffff;margin-bottom:4px">'],
+  ['letter-spacing:1.6px;color:#8593ab">CHARTER MARKETPLACE', 'letter-spacing:1.6px;color:#9fb2d4">CHARTER MARKETPLACE'],
+  ['border-radius:50%;background:#16233b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:pointer',
+    'border-radius:50%;background:#c6a667;color:#16233b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:pointer'],
+  ['<span style="background:#8a6d1f;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px">{{ dealCount }}</span>',
+    '<span style="background:#c6a667;color:#16233b;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px">{{ dealCount }}</span>'],
+  ['grid-template-columns:170px 1fr auto;gap:16px;background:#fff;border:1.5px solid {{ q.bd }}',
+    'grid-template-columns:220px 1fr auto;gap:18px;background:#fff;border:1.5px solid {{ q.bd }}'],
+  ['{{ q.aircraft }} · {{ q.seats }} seats · {{ q.year }}</div>', '{{ q.spec }}</div>'],
+  ['<meta name="theme-color" content="#2E6BE6">', '<meta name="theme-color" content="#16233b">'],
+  ['<div style="height:110px;border-radius:10px;overflow:hidden;margin-top:10px"><img src="{{ d.photo }}"',
+    '<div style="height:150px;border-radius:12px;overflow:hidden;margin-top:10px"><img src="{{ d.photo }}"'],
+];
+const LUX_PLACEHOLDER = /<div style="height:110px;border-radius:10px;background:repeating-linear-gradient\(45deg,#eef2f8,#eef2f8 8px,#e4eaf4 8px,#e4eaf4 16px\);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">\s*<span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:#8593ab">aircraft photo<\/span>/;
+const LUX_ART = '<div style="height:140px;border-radius:12px;background:#16233b;position:relative;overflow:hidden">'
+  + '<img src="{{ q.art }}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">'
+  + '<span style="position:absolute;left:12px;bottom:9px;font-size:9.5px;font-weight:800;letter-spacing:1.6px;color:#dcc48f">{{ q.artLabel }}</span>';
+const LUX_ROLE_TOGGLE = /<div style="display:flex;background:#eef2f8;border-radius:9px;padding:3px">(\s*<button sc-camel-on-click="\{\{ roleClient \}\}")/;
+const LUX_STYLE = '<style>/*lux*/@media (max-width:860px){[style*="grid-template-columns: 220px 1fr auto"]{grid-template-columns:1fr !important}}</style>\n';
+if (!newTemplate.includes('/*lux*/')) {
+  for (const [from, to] of LUX_EDITS) {
+    if (!newTemplate.includes(from)) throw new Error('lux anchor not found: ' + from.slice(0, 70));
+    newTemplate = newTemplate.replace(from, () => to);
+  }
+  if (!LUX_PLACEHOLDER.test(newTemplate) || !LUX_ROLE_TOGGLE.test(newTemplate)) throw new Error('lux placeholder/toggle anchors not found — template changed?');
+  newTemplate = newTemplate
+    .replace(LUX_PLACEHOLDER, () => LUX_ART)
+    .replace(LUX_ROLE_TOGGLE, (m, rest) => '<div style="display:flex;background:rgba(255,255,255,.1);border-radius:9px;padding:3px">' + rest)
+    .replace(MANIFEST_LINK, () => LUX_STYLE + MANIFEST_LINK);
+  console.log('applied luxury pass markup patch');
+}
+const LUX_COPY = [
+  ['">My requests', '">My trips'],
+  ['>MY REQUESTS<', '>MY TRIPS<'],
+  ["Post your trip once — vetted operators send you sealed quotes. They never see each other's bids.",
+    "Describe your trip once. Vetted operators reply with sealed offers, and none of them sees another's price."],
+  ['Sealed bidding — quotes are private to you · Free to post', 'Sealed bidding — offers are private to you · Free to post'],
+  ['Collecting sealed quotes…', 'Collecting sealed offers…'],
+  ['matching operators. Most quotes arrive within 2 hours.', 'matching operators. Most offers arrive within 2 hours.'],
+  ['Comparing {{ compareCount }} quotes', 'Comparing {{ compareCount }} offers'],
+  ['none of the quotes work for you — it only becomes the platform fee when you accept a quote.',
+    'none of the offers work for you — it only becomes the platform fee when you accept one.'],
+];
+for (const [from, to] of LUX_COPY) newTemplate = newTemplate.split(from).join(to);
+
 // Brand type: Quicksand for display text (headings, buttons, anything set
 // bold); Albert Sans stays for running text and inputs. The framework
 // re-serializes inline styles at runtime, hence the spaced "font-weight: 800".
@@ -1068,6 +1119,8 @@ if (!newTemplate.includes('family=Quicksand')) {
 // Brand tint: the design's two near-identical blue washes become the one
 // documented in brand/README.md. Runs last so earlier anchors still match.
 for (const wash of ['#e7eefc', '#E7EEFC', '#eef3fb', '#EEF3FB']) newTemplate = newTemplate.split(wash).join('#eef3fd');
+// Warm off-white page surfaces instead of the design's cool grays.
+for (const [cool, warm] of [['#f4f6fa', '#f8f6f1'], ['#f8fafd', '#fbf9f5'], ['#fbfcfe', '#fdfcf9']]) newTemplate = newTemplate.split(cool).join(warm);
 
 // Match the bundler's escaping: "</" must not appear raw inside a script tag.
 const newJson = JSON.stringify(newTemplate).replace(/<\//g, '<\\/');
@@ -1220,6 +1273,67 @@ function patchMapBrandType(doc) {
   return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
 }
 
+// Dark navy map. The tiles stay standard OpenStreetMap (no new provider, key
+// or licence): a CSS filter inverts them and folds every hue into navy. Map
+// chrome goes dark to match, and routes become light-blue arcs that bow north
+// the way great-circle tracks do.
+const MAP_DARK_CSS = `<style>/*map-dark*/
+#map{background:#0f1a2e}
+.leaflet-tile-pane{filter:invert(1) sepia(.85) hue-rotate(176deg) saturate(1.05) brightness(.92) contrast(1.02)}
+#legend{background:rgba(22,35,59,.92);color:#c9d6ee;box-shadow:0 3px 14px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08)}
+#legend .lg-title{color:#8fa3c8}
+.leaflet-bar{border:none !important;box-shadow:0 3px 12px rgba(0,0,0,.4)}
+.leaflet-bar a,.leaflet-bar a:hover{background:#16233b;color:#fff;border-bottom-color:rgba(255,255,255,.12)}
+.leaflet-bar a.leaflet-disabled{background:#1b2a45;color:#5d6f92}
+.leaflet-control-attribution{background:rgba(15,26,46,.72) !important;color:#8fa3c8}
+.leaflet-control-attribution a{color:#a8c4f4}
+</style>
+</head>`;
+// Joined with \n explicitly: a CRLF checkout of this file must not leak into a
+// multi-line anchor.
+const MAP_ROUTE_OLD = [
+  "      if (sg.f){ L.circleMarker(sg.f, { radius:5, color:'#2E6BE6', fillColor:'#fff', fillOpacity:1, weight:2.5 }).addTo(routeLayer); pts.push(sg.f); }",
+  "      if (sg.t){ L.circleMarker(sg.t, { radius:5, color:'#2E6BE6', fillColor:'#2E6BE6', fillOpacity:1, weight:2.5 }).addTo(routeLayer); pts.push(sg.t); }",
+  "      if (sg.f && sg.t) L.polyline([sg.f, sg.t], { color:'#2E6BE6', weight:2.5, dashArray:'7 7', opacity:.85 }).addTo(routeLayer);",
+].join('\n');
+const MAP_ROUTE_NEW = `      if (sg.f && sg.t) {
+        var arc = arcPoints(sg.f, sg.t);
+        L.polyline(arc, { color:'#A8C4F4', weight:9, opacity:.16, lineCap:'round', interactive:false }).addTo(routeLayer);
+        L.polyline(arc, { color:'#A8C4F4', weight:2.5, opacity:.95, lineCap:'round', interactive:false }).addTo(routeLayer);
+      }
+      if (sg.f){ L.circleMarker(sg.f, { radius:5, color:'#A8C4F4', fillColor:'#0f1a2e', fillOpacity:1, weight:2.5 }).addTo(routeLayer); pts.push(sg.f); }
+      if (sg.t){ L.circleMarker(sg.t, { radius:5, color:'#A8C4F4', fillColor:'#A8C4F4', fillOpacity:1, weight:2.5 }).addTo(routeLayer); pts.push(sg.t); }`;
+const MAP_ARC_FN = `function arcPoints(a, b){
+  var A = L.latLng(a), B = L.latLng(b);
+  var dx = B.lng - A.lng, dy = B.lat - A.lat, len = Math.sqrt(dx*dx + dy*dy);
+  if (!len) return [A, B];
+  var nx = -dy / len, ny = dx / len;
+  if (ny < 0) { nx = -nx; ny = -ny; }
+  var lift = Math.min(len * 0.2, 14);
+  var cx = (A.lng + B.lng) / 2 + nx * lift, cy = Math.min((A.lat + B.lat) / 2 + ny * lift, 84);
+  var out = [];
+  for (var i = 0; i <= 48; i++) { var t = i / 48, u = 1 - t; out.push([u*u*A.lat + 2*u*t*cy + t*t*B.lat, u*u*A.lng + 2*u*t*cx + t*t*B.lng]); }
+  return out;
+}
+var routeLayer = L.layerGroup().addTo(map);`;
+function patchMapDark(doc) {
+  const mOpen = '<script type="__bundler/template">';
+  const ms = doc.indexOf(mOpen);
+  if (ms === -1) return { doc, changed: false };
+  const mStart = ms + mOpen.length;
+  const mEnd = doc.indexOf('</script>', mStart);
+  let tpl = JSON.parse(doc.slice(mStart, mEnd));
+  if (tpl.includes('/*map-dark*/') || !tpl.includes('</head>')) return { doc, changed: false };
+  if (!tpl.includes(MAP_ROUTE_OLD) || !tpl.includes('var routeLayer = L.layerGroup().addTo(map);')) {
+    throw new Error('map route anchors not found — map page changed?');
+  }
+  tpl = tpl.replace('</head>', () => MAP_DARK_CSS)
+    .replace(MAP_ROUTE_OLD, () => MAP_ROUTE_NEW)
+    .replace('var routeLayer = L.layerGroup().addTo(map);', () => MAP_ARC_FN);
+  const tjson = JSON.stringify(tpl).replace(/<\//g, '<\\/');
+  return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
+}
+
 // Zoom-scaled marker cap: 25 circles at world view, 5x (125) when zoomed in.
 function patchMapZoomCap(doc) {
   const mOpen = '<script type="__bundler/template">';
@@ -1344,8 +1458,10 @@ function swapAirports(doc) {
       if (zoomed.changed) console.log('moved map zoom control to bottom-right');
       const typed = patchMapBrandType(zoomed.doc);
       if (typed.changed) console.log('applied brand type to nested map page');
-      if (res.changed || mapped.changed || styled.changed || scaled.changed || legended.changed || zoomed.changed || typed.changed) {
-        entry.data = zlib.gzipSync(Buffer.from(typed.doc, 'utf8')).toString('base64');
+      const dark = patchMapDark(typed.doc);
+      if (dark.changed) console.log('applied dark navy style + route arcs to nested map page');
+      if (res.changed || mapped.changed || styled.changed || scaled.changed || legended.changed || zoomed.changed || typed.changed || dark.changed) {
+        entry.data = zlib.gzipSync(Buffer.from(dark.doc, 'utf8')).toString('base64');
         entry.compressed = true;
         changed = true;
       }

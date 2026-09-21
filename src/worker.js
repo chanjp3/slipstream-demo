@@ -995,7 +995,7 @@ function emailHtml(title, lines, ctaText, ctaUrl) {
     if (ctaUrl) icon = '<img src="' + new URL(ctaUrl).origin + '/icon-192.png" width="30" height="30" alt="" style="border-radius:7px;vertical-align:middle;margin-right:10px">';
   } catch (e) { /* relative link: no icon */ }
   return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:26px">'
-    + '<div style="margin-bottom:18px">' + icon + '<span style="font-size:16px;font-weight:700;letter-spacing:3px;color:#16233b;vertical-align:middle">CHARTAVIA</span></div>'
+    + '<div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #c6a667">' + icon + '<span style="font-size:16px;font-weight:700;letter-spacing:3px;color:#16233b;vertical-align:middle">CHARTAVIA</span></div>'
     + '<div style="font-size:16px;font-weight:700;color:#16233b;margin-bottom:10px">' + title + '</div>'
     + lines.map((l) => '<p style="font-size:14px;color:#4a5a76;line-height:1.6;margin:0 0 10px">' + l + '</p>').join('')
     + (ctaUrl ? '<a href="' + ctaUrl + '" style="display:inline-block;margin-top:8px;background:#2E6BE6;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 20px;border-radius:9px">' + (ctaText || 'Open Chartavia') + '</a>' : '')
@@ -1365,10 +1365,10 @@ async function apiSubmitQuote(request, env, me, requestId) {
   } catch (e) {
     return json({ error: 'You already submitted a quote for this request' }, 409);
   }
-  await notifyUser(env, req.user_id, 'New sealed quote on ' + requestId,
-    ['A verified operator submitted a sealed quote of $' + price.toLocaleString('en-US') + ' on your request ' + requestId + '.',
-     'Compare it side by side with your other quotes, message the operator, and accept when ready.'],
-    new URL(request.url).origin + '/app', 'View your quotes');
+  await notifyUser(env, req.user_id, 'New sealed offer on ' + requestId,
+    ['A verified operator submitted a sealed offer of $' + price.toLocaleString('en-US') + ' on your request ' + requestId + '.',
+     'Compare it side by side with your other offers, message the operator, and accept when ready.'],
+    new URL(request.url).origin + '/app', 'View your offers');
   return json({ ok: true, price });
 }
 
