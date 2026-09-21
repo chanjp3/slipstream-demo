@@ -1,12 +1,12 @@
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (1, 'ava@demo.slipstream', 'Ava Sinclair', 'client', '6f2e3b1ad9e70c8dcd4ddb7c70968f5d', '99ea5fd6adbba24dc6c855bacb3a527e9f71e8fc886254c64b71a40449ad438b', 'free', NULL, NULL);
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (2, 'ben@demo.slipstream', 'Ben Okafor', 'client', 'b8f014b61b55b60620627c3a277d82fa', 'a7d8e1e029ea57512cea94a6a8b70d885fdc01d43ea7ef290fcf37b4d05171f4', 'plus', NULL, NULL);
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (3, 'meridian@demo.slipstream', 'Meridian Charter Ops', 'operator', '05d8e3f3085a628054417fad61889d97', '6c040aa5af8a6228da968299ca382a6bba2da02084d50bd757f35442b904758a', 'pro', 3, 'admin');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (4, 'dana@demo.slipstream', 'Dana Reyes', 'operator', '99fd754575124a264c04cd1a4a93332b', 'fca0bea9cec7e94a496d058a9b52c4edfe7c3ecca024455742b2c319699fc857', 'free', 3, 'member');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (5, 'bluewing@demo.slipstream', 'Bluewing Charters', 'operator', 'ec721d0eaa5bb5d2bd6729f04ccfd773', '155a863eddee5c4cf31ac262f0003b01ef73636cba92c0c7c70d21a4900ea021', 'free', 5, 'admin');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (6, 'mkt-priya@demo.slipstream', 'Priya Nair', 'client', 'x', 'x', 'free');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (7, 'mkt-luc@demo.slipstream', 'Luc Moreau', 'client', 'x', 'x', 'free');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (8, 'mkt-omar@demo.slipstream', 'Omar Haddad', 'client', 'x', 'x', 'free');
-INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (9, 'mkt-elena@demo.slipstream', 'Elena Vasquez', 'client', 'x', 'x', 'free');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (1, 'ava@demo.chartavia', 'Ava Sinclair', 'client', '6f2e3b1ad9e70c8dcd4ddb7c70968f5d', '99ea5fd6adbba24dc6c855bacb3a527e9f71e8fc886254c64b71a40449ad438b', 'free', NULL, NULL);
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (2, 'ben@demo.chartavia', 'Ben Okafor', 'client', 'b8f014b61b55b60620627c3a277d82fa', 'a7d8e1e029ea57512cea94a6a8b70d885fdc01d43ea7ef290fcf37b4d05171f4', 'plus', NULL, NULL);
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (3, 'meridian@demo.chartavia', 'Meridian Charter Ops', 'operator', '05d8e3f3085a628054417fad61889d97', '6c040aa5af8a6228da968299ca382a6bba2da02084d50bd757f35442b904758a', 'pro', 3, 'admin');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (4, 'dana@demo.chartavia', 'Dana Reyes', 'operator', '99fd754575124a264c04cd1a4a93332b', 'fca0bea9cec7e94a496d058a9b52c4edfe7c3ecca024455742b2c319699fc857', 'free', 3, 'member');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan, org_id, org_role) VALUES (5, 'bluewing@demo.chartavia', 'Bluewing Charters', 'operator', 'ec721d0eaa5bb5d2bd6729f04ccfd773', '155a863eddee5c4cf31ac262f0003b01ef73636cba92c0c7c70d21a4900ea021', 'free', 5, 'admin');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (6, 'mkt-priya@demo.chartavia', 'Priya Nair', 'client', 'x', 'x', 'free');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (7, 'mkt-luc@demo.chartavia', 'Luc Moreau', 'client', 'x', 'x', 'free');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (8, 'mkt-omar@demo.chartavia', 'Omar Haddad', 'client', 'x', 'x', 'free');
+INSERT OR IGNORE INTO users (id, email, name, role, salt, hash, plan) VALUES (9, 'mkt-elena@demo.chartavia', 'Elena Vasquez', 'client', 'x', 'x', 'free');
 
 -- Meridian: fully verified operator org (badge: FAA-checked fleet)
 INSERT OR IGNORE INTO operator_profiles (user_id, company, cert_number, base_iata, safety_program, d085_name, d085_at, checked_at, updated_at)

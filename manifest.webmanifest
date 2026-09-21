@@ -1,6 +1,6 @@
 {
-  "name": "Slipstream Demo — Private Charter Marketplace",
-  "short_name": "Slipstream Demo",
+  "name": "Chartavia Demo — Private Charter Marketplace",
+  "short_name": "Chartavia Demo",
   "description": "Post your trip once. FAA-verified operators compete with sealed quotes.",
   "start_url": "/app",
   "scope": "/",

@@ -56,6 +56,24 @@ if (!newTemplate.includes('manifest.webmanifest')) {
   console.log('applied PWA + mobile-shim markup patch');
 }
 
+// Brand name. Only visible text is renamed: slip-* classes, storage keys and
+// other internal identifiers keep the old name so the guards below still match.
+const OLD_WORDMARK = 'letter-spacing:-.2px">Slipstream</div>';
+if (newTemplate.includes(OLD_WORDMARK)) {
+  newTemplate = newTemplate.replace(OLD_WORDMARK, () => 'letter-spacing:-.2px">Chartavia</div>');
+  console.log('applied Chartavia wordmark markup patch');
+}
+const MANIFEST_LINK = '<link rel="manifest" href="/manifest.webmanifest">';
+const BRAND_HEAD = '<title>Chartavia — Charter Marketplace</title>\n'
+  + '<meta name="application-name" content="Chartavia">\n'
+  + '<meta name="apple-mobile-web-app-title" content="Chartavia">\n'
+  + MANIFEST_LINK;
+if (!newTemplate.includes('<title>Chartavia')) {
+  if (!newTemplate.includes(MANIFEST_LINK)) throw new Error('manifest link not found — template changed?');
+  newTemplate = newTemplate.replace(MANIFEST_LINK, () => BRAND_HEAD);
+  console.log('applied Chartavia title + app-name markup patch');
+}
+
 // Mobile map expand: on phone widths an "Expand map" button floats over the
 // request-screen map; tapping it makes the map (with its airport search
 // panel) fullscreen. Injected as a survives-document-replacement script.

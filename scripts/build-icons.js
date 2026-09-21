@@ -1,4 +1,4 @@
-// Renders the Slipstream logo (blue rounded square, two rotated streaks) to
+// Renders the Chartavia logo (blue rounded square, two rotated streaks) to
 // public/icon-192.png and public/icon-512.png without any image libraries.
 const fs = require('fs');
 const path = require('path');

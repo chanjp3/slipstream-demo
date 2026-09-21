@@ -20,17 +20,17 @@ async function hash(password, saltHex) {
   const PW = 'demopass123';
   const personas = [
     // [id, email, name, role, plan, org_id, org_role]
-    [1, 'ava@demo.slipstream', 'Ava Sinclair', 'client', 'free', null, null],
-    [2, 'ben@demo.slipstream', 'Ben Okafor', 'client', 'plus', null, null],
-    [3, 'meridian@demo.slipstream', 'Meridian Charter Ops', 'operator', 'pro', 3, "admin"],
-    [4, 'dana@demo.slipstream', 'Dana Reyes', 'operator', 'free', 3, "member"],
-    [5, 'bluewing@demo.slipstream', 'Bluewing Charters', 'operator', 'free', 5, "admin"],
+    [1, 'ava@demo.chartavia', 'Ava Sinclair', 'client', 'free', null, null],
+    [2, 'ben@demo.chartavia', 'Ben Okafor', 'client', 'plus', null, null],
+    [3, 'meridian@demo.chartavia', 'Meridian Charter Ops', 'operator', 'pro', 3, "admin"],
+    [4, 'dana@demo.chartavia', 'Dana Reyes', 'operator', 'free', 3, "member"],
+    [5, 'bluewing@demo.chartavia', 'Bluewing Charters', 'operator', 'free', 5, "admin"],
   ];
   const marketClients = [
-    [6, 'mkt-priya@demo.slipstream', 'Priya Nair'],
-    [7, 'mkt-luc@demo.slipstream', 'Luc Moreau'],
-    [8, 'mkt-omar@demo.slipstream', 'Omar Haddad'],
-    [9, 'mkt-elena@demo.slipstream', 'Elena Vasquez'],
+    [6, 'mkt-priya@demo.chartavia', 'Priya Nair'],
+    [7, 'mkt-luc@demo.chartavia', 'Luc Moreau'],
+    [8, 'mkt-omar@demo.chartavia', 'Omar Haddad'],
+    [9, 'mkt-elena@demo.chartavia', 'Elena Vasquez'],
   ];
 
   const lines = [];

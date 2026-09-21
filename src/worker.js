@@ -1,4 +1,4 @@
-// Slipstream Charter Marketplace — auth + marketplace API
+// Chartavia Charter Marketplace — auth + marketplace API
 // Users, requests, quotes, and messages live in D1; sessions live in Workers KV.
 
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 days
@@ -6,14 +6,14 @@ const PBKDF2_ITERATIONS = 100_000;
 
 // ---------------------------------------------------------------- demo mode
 // This deployment is a guided demo: anyone can switch between seeded personas
-// to see both sides of the marketplace. Only @demo.slipstream accounts are
+// to see both sides of the marketplace. Only @demo.chartavia accounts are
 // switchable — real registrations still work but can't be impersonated.
 const DEMO_PERSONAS = [
-  { email: 'ava@demo.slipstream', label: 'Ava · Client' },
-  { email: 'ben@demo.slipstream', label: 'Ben · Client (Plus)' },
-  { email: 'meridian@demo.slipstream', label: 'Meridian · Op Admin' },
-  { email: 'dana@demo.slipstream', label: 'Dana · Op Member' },
-  { email: 'bluewing@demo.slipstream', label: 'Bluewing · Operator' },
+  { email: 'ava@demo.chartavia', label: 'Ava · Client' },
+  { email: 'ben@demo.chartavia', label: 'Ben · Client (Plus)' },
+  { email: 'meridian@demo.chartavia', label: 'Meridian · Op Admin' },
+  { email: 'dana@demo.chartavia', label: 'Dana · Op Member' },
+  { email: 'bluewing@demo.chartavia', label: 'Bluewing · Operator' },
 ];
 
 async function demoSessionFor(env, email) {
@@ -174,7 +174,8 @@ async function handlePage(request, env, path) {
           '&quot;default&quot;:&quot;operator&quot;'
         );
       }
-      html = html.replace('</body>', demoToolbar(session.email) + '</body>');
+      const current = await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(session.id).first();
+      html = html.replace('</body>', demoToolbar(current ? current.email : session.email) + '</body>');
       const headers = {
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-store',
@@ -200,18 +201,19 @@ async function handleApi(request, env, path) {
     if (path === '/api/reset' && method === 'POST') return await apiResetPassword(request, env);
 
     // Everything below requires a session. The user row is consulted on every
-    // request: org membership changes and session-epoch bumps (password
-    // change) take effect immediately.
+    // request: org membership changes, email changes and session-epoch bumps
+    // (password change) take effect immediately.
     const me = await getSession(request, env);
     if (!me) return json({ error: 'Not signed in' }, 401);
     const row = await env.DB.prepare(
-      'SELECT org_id, org_role, session_epoch FROM users WHERE id = ?'
+      'SELECT email, org_id, org_role, session_epoch FROM users WHERE id = ?'
     ).bind(me.id).first();
     if (!row || (me.epoch || 0) !== (row.session_epoch || 0)) {
       const token = getCookie(request, 'slipstream_session');
       if (token) await env.SLIPSTREAM_KV.delete('sess:' + token);
       return json({ error: 'Not signed in' }, 401);
     }
+    me.email = row.email;
     if (me.role === 'operator') {
       me.orgId = row.org_id || me.id;
       me.orgRole = row.org_role || 'admin';
@@ -319,7 +321,7 @@ async function apiRegister(request, env) {
         .bind(invite.org_id, 'member', userId).run();
       await env.DB.prepare("UPDATE org_invites SET used_by = ?, used_at = datetime('now') WHERE code = ?")
         .bind(userId, invite.code).run();
-      await notifyUser(env, invite.org_id, name + ' joined your Slipstream team',
+      await notifyUser(env, invite.org_id, name + ' joined your Chartavia team',
         [name + ' registered with your invite code and can now quote and message under your company profile.'],
         new URL(request.url).origin + '/app', 'View your team');
     } else {
@@ -376,7 +378,7 @@ async function apiForgotPassword(request, env) {
     const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
     await env.SLIPSTREAM_KV.put('pwreset:' + token, JSON.stringify({ id: user.id }), { expirationTtl: 1800 });
     const link = new URL(request.url).origin + '/reset?token=' + token;
-    await sendEmail(env, email, 'Reset your Slipstream password',
+    await sendEmail(env, email, 'Reset your Chartavia password',
       emailHtml('Reset your password',
         ['Someone (hopefully you) asked to reset the password for this account.',
          'The link below works once and expires in 30 minutes. If you didn\u2019t ask, ignore this email \u2014 nothing changes.'],
@@ -977,7 +979,7 @@ async function sendEmail(env, to, subject, html) {
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { authorization: 'Bearer ' + env.RESEND_API_KEY, 'content-type': 'application/json' },
-        body: JSON.stringify({ from: env.EMAIL_FROM || 'Slipstream <onboarding@resend.dev>', to: [to], subject, html }),
+        body: JSON.stringify({ from: env.EMAIL_FROM || 'Chartavia <onboarding@resend.dev>', to: [to], subject, html }),
       });
     } else {
       await env.DB.prepare('INSERT INTO email_outbox (to_email, subject, html) VALUES (?, ?, ?)')
@@ -988,11 +990,11 @@ async function sendEmail(env, to, subject, html) {
 
 function emailHtml(title, lines, ctaText, ctaUrl) {
   return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:26px">'
-    + '<div style="font-size:18px;font-weight:800;color:#2E6BE6;margin-bottom:16px">Slipstream</div>'
+    + '<div style="font-size:18px;font-weight:800;color:#2E6BE6;margin-bottom:16px">Chartavia</div>'
     + '<div style="font-size:16px;font-weight:700;color:#16233b;margin-bottom:10px">' + title + '</div>'
     + lines.map((l) => '<p style="font-size:14px;color:#4a5a76;line-height:1.6;margin:0 0 10px">' + l + '</p>').join('')
-    + (ctaUrl ? '<a href="' + ctaUrl + '" style="display:inline-block;margin-top:8px;background:#2E6BE6;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 20px;border-radius:9px">' + (ctaText || 'Open Slipstream') + '</a>' : '')
-    + '<p style="font-size:12px;color:#8593ab;margin-top:24px">You received this because of activity on your Slipstream account.</p>'
+    + (ctaUrl ? '<a href="' + ctaUrl + '" style="display:inline-block;margin-top:8px;background:#2E6BE6;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 20px;border-radius:9px">' + (ctaText || 'Open Chartavia') + '</a>' : '')
+    + '<p style="font-size:12px;color:#8593ab;margin-top:24px">You received this because of activity on your Chartavia account.</p>'
     + '</div>';
 }
 
@@ -1458,10 +1460,10 @@ async function apiTripAction(request, env, me, requestId) {
       : next === 'completed' ? requestId + ' is marked complete. How was it? Leave a review to help other travelers.'
       : requestId + ' was cancelled.';
     if (isWinningOp) {
-      await notifyUser(env, req.user_id, label + ' \u2014 ' + requestId, [line], origin + '/app', 'Open Slipstream');
+      await notifyUser(env, req.user_id, label + ' \u2014 ' + requestId, [line], origin + '/app', 'Open Chartavia');
     } else if (q) {
       const bidder = await env.DB.prepare('SELECT operator_id FROM quotes q WHERE q.id = ?').bind(req.accepted_quote_id).first();
-      if (bidder) await notifyUser(env, bidder.operator_id, 'Trip cancelled by the client \u2014 ' + requestId, [line], origin + '/app', 'Open Slipstream');
+      if (bidder) await notifyUser(env, bidder.operator_id, 'Trip cancelled by the client \u2014 ' + requestId, [line], origin + '/app', 'Open Chartavia');
     }
   }
   return json({ ok: true, tripStatus: next });
@@ -1764,8 +1766,8 @@ async function apiSendMessage(request, env, me, quoteId) {
   {
     const recipient = me.id === q.client_id ? q.operator_id : q.client_id;
     if (await shouldNotify(env, 'msg:' + quoteId + ':' + recipient)) {
-      await notifyUser(env, recipient, 'New message on Slipstream',
-        ['You have a new message in one of your Slipstream conversations.'],
+      await notifyUser(env, recipient, 'New message on Chartavia',
+        ['You have a new message in one of your Chartavia conversations.'],
         new URL(request.url).origin + '/app', 'Read & reply');
     }
   }

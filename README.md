@@ -1,6 +1,10 @@
-# Slipstream — Demo Playground
+# Chartavia — Demo Playground
 
-**This is the interactive demo deployment** of [Slipstream](https://github.com/chanjp3/slipstream): identical code, plus a persona switcher. Open the app and use the DEMO · VIEW AS bar at the bottom to jump between two clients and three operator seats (admin, team member, competitor) — no logins needed. Post a request as Ava, switch to Meridian to quote it, switch back to accept. Personas are seeded by scripts/seed-demo.js (password demopass123 if you want the login flow); real registrations work but cannot be impersonated.
+> Formerly Slipstream. Only the visible brand was renamed: the repo, worker names,
+> D1 databases, the `SLIPSTREAM_KV` binding, the `slipstream_session` cookie and the
+> `slip-*` CSS classes keep the old name so deployments, sessions and patch guards keep working.
+
+**This is the interactive demo deployment** of [Chartavia](https://github.com/chanjp3/slipstream): identical code, plus a persona switcher. Open the app and use the DEMO · VIEW AS bar at the bottom to jump between two clients and three operator seats (admin, team member, competitor) — no logins needed. Post a request as Ava, switch to Meridian to quote it, switch back to accept. Personas are seeded by scripts/seed-demo.js (password demopass123 if you want the login flow); real registrations work but cannot be impersonated.
 
 ---
 

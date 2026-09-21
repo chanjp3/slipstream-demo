@@ -643,7 +643,7 @@ class Component extends DCLogic {
       // plan + demo checkout
       planLabel: !this.me ? '—'
         : this.me.plan === 'pro' ? 'Operator Pro'
-        : this.me.plan === 'plus' ? 'Slipstream Plus'
+        : this.me.plan === 'plus' ? 'Chartavia Plus'
         : 'Free plan',
       planDetail: !this.me ? ''
         : (realRole === 'operator'
@@ -661,7 +661,7 @@ class Component extends DCLogic {
       openCheckout: () => this.setState({ checkoutOpen: true, menuOpen: false }),
       downgradePlan: () => this.downgradePlan(),
       checkoutOpen: s.checkoutOpen,
-      coTag: realRole === 'operator' ? 'SLIPSTREAM PRO' : 'SLIPSTREAM PLUS',
+      coTag: realRole === 'operator' ? 'CHARTAVIA PRO' : 'CHARTAVIA PLUS',
       coName: realRole === 'operator' ? 'Operator Pro' : 'Traveler Plus',
       coPrice: realRole === 'operator' ? '$299' : '$79',
       coFeatures: realRole === 'operator'
