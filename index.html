@@ -49,7 +49,8 @@
     @media (max-width: 860px) { .nav-links { display: none; } }
 
     /* ---------- hero ---------- */
-    .hero { background: var(--navy); color: #fff; overflow: hidden; position: relative; border-bottom: 1px solid rgba(198,166,103,.45); }
+    .hero { background: linear-gradient(90deg, rgba(22,35,59,.97) 0%, rgba(22,35,59,.9) 42%, rgba(22,35,59,.62) 100%), url(/img/aircraft/g650er-flight.webp) center right / cover no-repeat var(--navy); color: #fff; overflow: hidden; position: relative; border-bottom: 1px solid rgba(198,166,103,.45); }
+    @media (max-width: 940px) { .hero { background: linear-gradient(180deg, rgba(22,35,59,.94) 0%, rgba(22,35,59,.9) 100%), url(/img/aircraft/g650er-flight-800.webp) center / cover no-repeat var(--navy); } }
     .brand-jet { position: absolute; pointer-events: none; opacity: .06; }
     .brand-jet svg { width: 100%; height: 100%; display: block; }
     .hero .brand-jet { right: -150px; top: -130px; width: 820px; height: 820px; }
@@ -62,14 +63,14 @@
     .hero-note b { font-weight: 800; color: #fff; }
 
     /* hero mock quote cards */
-    .mock { position: relative; min-height: 420px; }
+    .mock { position: relative; min-height: 520px; }
     .mock-card {
       position: absolute; background: #fff; color: var(--navy); border-radius: 16px;
       box-shadow: 0 24px 60px rgba(10,25,60,.35); padding: 18px 20px; width: 330px;
     }
     .mock-req { top: 0; right: 40px; transform: rotate(2deg); }
     .mock-q1 { top: 128px; right: 96px; transform: rotate(-1.5deg); z-index: 2; }
-    .mock-q2 { top: 268px; right: 18px; transform: rotate(1deg); }
+    .mock-q2 { top: 330px; right: 18px; transform: rotate(1deg); }
     .mock-route { font-family: ui-monospace, Menlo, monospace; font-weight: 800; font-size: 19px; letter-spacing: -.5px; }
     .mock-sub { font-size: 12px; color: var(--mist); margin-top: 3px; }
     .mock-tag { float: right; font-size: 9.5px; font-weight: 800; letter-spacing: .6px; padding: 3px 9px; border-radius: 999px; }
@@ -78,6 +79,8 @@
     .mock-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
     .mock-op { font-size: 13px; font-weight: 800; }
     .mock-trust { font-size: 11px; color: var(--mist); margin-top: 2px; }
+    .mock-photo { height: 58px; border-radius: 10px; background-size: cover; background-position: center; margin-top: 10px; }
+    .mock-ac { font-size: 11.5px; font-weight: 700; color: var(--slate); margin-top: 7px; }
     .mock-price { font-size: 20px; font-weight: 800; }
     .mock-accept { font-size: 11.5px; font-weight: 800; color: #fff; background: var(--navy); border-radius: 8px; padding: 7px 12px; }
     .float-badge {
@@ -86,12 +89,27 @@
       display: flex; align-items: center; gap: 7px;
     }
     .fb-1 { top: 96px; left: -6px; z-index: 3; }
-    .fb-2 { top: 404px; right: 190px; z-index: 3; }
+    .fb-2 { top: 520px; right: 190px; z-index: 3; }
     .dot { width: 8px; height: 8px; border-radius: 50%; }
     @media (max-width: 940px) {
       .hero-inner { grid-template-columns: 1fr; padding-top: 64px; padding-bottom: 72px; }
       .mock { display: none; }
     }
+
+    /* aircraft */
+    .fleet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 34px; }
+    .fleet-card { background: #fff; border: 1.5px solid var(--line); border-radius: 20px; overflow: hidden; }
+    .fleet-media { position: relative; aspect-ratio: 3 / 2; background: #0f1a2e; }
+    .fleet-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .fleet-cabin { position: absolute; right: 10px; bottom: 10px; width: 40%; aspect-ratio: 3 / 2; border-radius: 10px; overflow: hidden; border: 2px solid #fff; box-shadow: 0 8px 22px rgba(10,25,60,.35); transition: width .35s ease, right .35s ease, bottom .35s ease, border-radius .35s ease; }
+    .fleet-card:hover .fleet-cabin { width: 100%; right: 0; bottom: 0; border-radius: 0; border-color: transparent; }
+    .fleet-body { padding: 16px 18px 18px; }
+    .fleet-class { font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--gold-ink); }
+    .fleet-body h3 { font-size: 18px; font-weight: 700; margin-top: 6px; }
+    .fleet-body p { font-size: 13.5px; line-height: 1.55; color: var(--slate); margin-top: 6px; }
+    .fleet-note { margin-top: 18px; font-size: 12.5px; color: var(--mist); }
+    @media (max-width: 980px) { .fleet { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .fleet { grid-template-columns: 1fr; } }
 
     /* ---------- stats strip ---------- */
     .stats { border-bottom: 1px solid var(--line); }
@@ -254,6 +272,7 @@
     <div class="nav-links">
       <a href="#how">How it works</a>
       <a href="#operators">For operators</a>
+      <a href="#aircraft">Aircraft</a>
       <a href="#trust">Verification</a>
       <a href="#pricing">Pricing</a>
     </div>
@@ -288,6 +307,8 @@
         <span class="mock-tag tag-blue">SEALED OFFER</span>
         <div class="mock-op">Operator A</div>
         <div class="mock-trust">ARGUS Platinum · FAA-checked fleet · 4.9 ★ (37) · responds ~1 h</div>
+        <div class="mock-photo" style="background-image:url(/img/aircraft/phenom-300-club-800.webp)"></div>
+        <div class="mock-ac">Embraer Phenom 300 · 7 seats</div>
         <div class="mock-row">
           <div class="mock-price">$13,900</div>
           <div class="mock-accept">Accept offer</div>
@@ -297,6 +318,8 @@
         <span class="mock-tag tag-blue">SEALED OFFER</span>
         <div class="mock-op">Operator B</div>
         <div class="mock-trust">Wyvern Wingman · FAA-checked · 4.7 ★ (12) · responds ~2 h</div>
+        <div class="mock-photo" style="background-image:url(/img/aircraft/citation-cj3-club-800.webp)"></div>
+        <div class="mock-ac">Cessna Citation CJ3 · 6 seats</div>
         <div class="mock-row">
           <div class="mock-price">$15,800</div>
           <div class="mock-accept" style="background:#eef2f8;color:#a9b4c8">Accept offer</div>
@@ -342,6 +365,45 @@
         <p>Accept the offer you prefer — only then is the operator's identity revealed. Chat directly, receive the contract, confirm the trip, and leave a review afterward. Didn't like the options? Close the request and your deposit refunds in full.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="aircraft" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-kicker rv">AIRCRAFT</div>
+    <h2 class="rv">From a turboprop for the short hop to a cabin that crosses oceans</h2>
+    <p class="sec-sub rv">Operators quote the aircraft they actually fly. These four types cover most requests, from a single-engine turboprop to an ultra-long-range jet. Hover a card for the cabin.</p>
+    <div class="fleet">
+      <div class="fleet-card rv">
+        <div class="fleet-media">
+          <picture><source media="(max-width: 700px)" srcset="/img/aircraft/pc-12-ng-exterior-800.webp"><img src="/img/aircraft/pc-12-ng-exterior.webp" alt="Pilatus PC-12 NG turboprop on the ramp at sunset" loading="lazy"></picture>
+          <div class="fleet-cabin"><img src="/img/aircraft/pc-12-ng-cabin-800.webp" alt="Pilatus PC-12 NG cabin" loading="lazy"></div>
+        </div>
+        <div class="fleet-body"><div class="fleet-class">TURBOPROP</div><h3>Pilatus PC-12 NG</h3><p>Six to eight seats and about 1,800 nautical miles. Uses short and unpaved strips the jets cannot, at turboprop cost.</p></div>
+      </div>
+      <div class="fleet-card rv">
+        <div class="fleet-media">
+          <picture><source media="(max-width: 700px)" srcset="/img/aircraft/phenom-300-exterior-800.webp"><img src="/img/aircraft/phenom-300-exterior.webp" alt="Embraer Phenom 300 light jet on the ramp at sunset" loading="lazy"></picture>
+          <div class="fleet-cabin"><img src="/img/aircraft/phenom-300-cabin-800.webp" alt="Embraer Phenom 300 cabin" loading="lazy"></div>
+        </div>
+        <div class="fleet-body"><div class="fleet-class">LIGHT JET</div><h3>Embraer Phenom 300</h3><p>Six to eight seats, about 2,000 nautical miles. The best-selling light jet, with a proper lavatory and a large baggage hold.</p></div>
+      </div>
+      <div class="fleet-card rv">
+        <div class="fleet-media">
+          <picture><source media="(max-width: 700px)" srcset="/img/aircraft/citation-cj3-exterior-800.webp"><img src="/img/aircraft/citation-cj3-exterior.webp" alt="Cessna Citation CJ3 light jet on the ramp at sunset" loading="lazy"></picture>
+          <div class="fleet-cabin"><img src="/img/aircraft/citation-cj3-cabin-800.webp" alt="Cessna Citation CJ3 cabin" loading="lazy"></div>
+        </div>
+        <div class="fleet-body"><div class="fleet-class">LIGHT JET</div><h3>Cessna Citation CJ3</h3><p>Six to seven seats, about 2,000 nautical miles. Efficient and single-pilot capable, a favorite for one- to three-hour hops.</p></div>
+      </div>
+      <div class="fleet-card rv">
+        <div class="fleet-media">
+          <picture><source media="(max-width: 700px)" srcset="/img/aircraft/g650er-exterior-800.webp"><img src="/img/aircraft/g650er-exterior.webp" alt="Gulfstream G650ER on the ramp at sunset" loading="lazy"></picture>
+          <div class="fleet-cabin"><img src="/img/aircraft/g650er-cabin-800.webp" alt="Gulfstream G650ER cabin" loading="lazy"></div>
+        </div>
+        <div class="fleet-body"><div class="fleet-class">ULTRA-LONG-RANGE</div><h3>Gulfstream G650ER</h3><p>Thirteen to nineteen seats and 7,500 nautical miles: coast to coast, or New York to Tokyo, nonstop.</p></div>
+      </div>
+    </div>
+    <p class="fleet-note rv">Illustrations of the four types. Every accepted offer shows the operator’s own aircraft and photographs.</p>
   </div>
 </section>
 
@@ -444,7 +506,8 @@
         <div class="leg-card">
           <span class="mock-tag tag-amber">EMPTY LEG</span>
           <div class="mock-route">PBI → TEB</div>
-          <div class="mock-sub">Aug 16 · 2:00 PM · Citation Latitude</div>
+          <div class="mock-sub">Aug 16 · 2:00 PM · Embraer Phenom 300</div>
+          <div class="mock-photo" style="background-image:url(/img/aircraft/phenom-300-flight-800.webp);height:88px"></div>
           <div class="mock-trust" style="margin-top:8px">Verified operator · ARGUS Platinum · 4.9 ★</div>
           <div class="mock-row">
             <div class="mock-price">$9,500</div>

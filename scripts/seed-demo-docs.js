@@ -30,12 +30,12 @@ const NOTICE = ['SAMPLE DOCUMENT for the Chartavia demo.', 'Not a real certifica
 const DOCS = {
   'meridian@demo.chartavia': [
     ['/api/operator/certificate', 'meridian-air-carrier-certificate.pdf', 'Air Carrier Certificate (sample)', ['Meridian Jet Group', 'Certificate MJGA085K']],
-    ['/api/operator/d085', 'meridian-d085.pdf', 'OpSpec D085 Aircraft Listing (sample)', ['Meridian Jet Group', 'N502QS  Citation Latitude', 'N510JK  Citation Mustang']],
+    ['/api/operator/d085', 'meridian-d085.pdf', 'OpSpec D085 Aircraft Listing (sample)', ['Meridian Jet Group', 'N102CH  Phenom 300E', 'N125CD  Citation CJ3+']],
     ['/api/operator/safety-doc', 'meridian-argus-platinum.pdf', 'ARGUS Platinum Audit Certificate (sample)', ['Meridian Jet Group']],
   ],
   'northline@demo.chartavia': [
     ['/api/operator/certificate', 'northline-air-carrier-certificate.pdf', 'Air Carrier Certificate (sample)', ['Northline Air Charter', 'Certificate NRLA417K']],
-    ['/api/operator/d085', 'northline-d085-reissued.pdf', 'OpSpec D085 Aircraft Listing (sample, reissued)', ['Northline Air Charter', 'N787QS  Challenger 350', 'N415QS  Gulfstream G450  (added on this reissue)']],
+    ['/api/operator/d085', 'northline-d085-reissued.pdf', 'OpSpec D085 Aircraft Listing (sample, reissued)', ['Northline Air Charter', 'N113BD  PC-12 NG', 'N126TS  PC-12 NG  (added on this reissue)']],
     ['/api/operator/safety-doc', 'northline-wyvern-registered.pdf', 'Wyvern Registered Operator Certificate (sample)', ['Northline Air Charter']],
   ],
 };
