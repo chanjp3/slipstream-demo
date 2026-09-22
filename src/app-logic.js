@@ -988,7 +988,7 @@ class Component extends DCLogic {
 
       // request builder
       mapRef: this.mapRef,
-      mapSrc: (window.__resources && window.__resources.mapPage) || './map.html',
+      mapSrc: '/map.html',
       tripTypes: [['oneway', 'One way'], ['round', 'Round trip'], ['multi', 'Multi-city']].map(([id, label]) => ({
         label, onPick: () => this.setTrip(id), ...seg(s.tripType === id)
       })),

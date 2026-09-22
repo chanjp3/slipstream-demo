@@ -95,8 +95,10 @@ export default {
 function withSecurityHeaders(res) {
   const out = new Response(res.body, res);
   out.headers.set('x-content-type-options', 'nosniff');
-  out.headers.set('x-frame-options', 'DENY');
-  out.headers.set('referrer-policy', 'same-origin');
+  // /map.html sets its own: it is framed by /app, and it must name our origin
+  // to the tile servers (OpenStreetMap refuses requests with no Referer).
+  if (!out.headers.has('x-frame-options')) out.headers.set('x-frame-options', 'DENY');
+  if (!out.headers.has('referrer-policy')) out.headers.set('referrer-policy', 'same-origin');
   return out;
 }
 
@@ -161,6 +163,25 @@ async function handlePage(request, env, path) {
     if (tripDoc) {
       if (!session) return redirect('/login');
       return await tripDocPage(request, env, session, tripDoc[1]);
+    }
+
+    // The airport map, framed by /app. Served here rather than as a blob:
+    // document so the browser can send our origin to the tile server, and so
+    // the map provider's key travels with the page instead of the bundle.
+    if (path === '/map.html') {
+      if (!session) return new Response('Sign in to use the map.', { status: 401, headers: { 'content-type': 'text/plain' } });
+      const res = await serveAsset(env, request, '/map.html');
+      if (!res.ok) return res;
+      const cfg = JSON.stringify({ mapboxToken: env.MAPBOX_TOKEN || null }).replace(/</g, '\\u003c');
+      const html = (await res.text()).replace('<head>', () => '<head><script>window.__MAP=' + cfg + '</script>');
+      return new Response(html, {
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'private, max-age=300',
+          'referrer-policy': 'strict-origin-when-cross-origin',
+          'x-frame-options': 'SAMEORIGIN',
+        },
+      });
     }
 
     // Never serve the app bundle directly — it must go through the auth gate.

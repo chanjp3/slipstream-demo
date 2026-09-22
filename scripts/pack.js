@@ -1740,6 +1740,95 @@ function patchMapTableau(doc) {
   return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
 }
 
+// Tile provider. Mapbox's dark style when the worker injected a token (see
+// /map.html), else OpenStreetMap under the navy CSS filter. The map is created
+// before this runs, so the tile pane exists.
+const OSM_LAYER = "L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap contributors', maxZoom:12 }).addTo(map);";
+const PROVIDER_LAYER = `(function(){
+  var token = window.__MAP && window.__MAP.mapboxToken;
+  if (token) {
+    document.documentElement.classList.add('mapbox');
+    map.getPane('tilePane').style.filter = 'none';
+    L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}{r}?access_token=' + encodeURIComponent(token), {
+      tileSize:512, zoomOffset:-1, maxZoom:12,
+      attribution:'<a href="https://www.mapbox.com/about/maps/" target="_blank">© Mapbox</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap</a> <a href="https://www.mapbox.com/map-feedback/" target="_blank">Improve this map</a>'
+    }).addTo(map);
+  } else {
+    ${OSM_LAYER}
+  }
+})();`;
+function patchMapProvider(doc) {
+  const mOpen = '<script type="__bundler/template">';
+  const ms = doc.indexOf(mOpen);
+  if (ms === -1) return { doc, changed: false };
+  const mStart = ms + mOpen.length;
+  const mEnd = doc.indexOf('</script>', mStart);
+  let tpl = JSON.parse(doc.slice(mStart, mEnd));
+  if (tpl.includes('window.__MAP')) return { doc, changed: false };
+  if (!tpl.includes(OSM_LAYER)) throw new Error('tile layer anchor not found — map page changed?');
+  tpl = tpl.replace(OSM_LAYER, () => PROVIDER_LAYER);
+  const tjson = JSON.stringify(tpl).replace(/<\//g, '<\\/');
+  return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
+}
+
+// Served from /map.html the map can initialise while its frame is still
+// collapsed, and Leaflet only re-measures on a window resize: watch the
+// container and re-measure (and rebuild the markers) once it has a size.
+const MARKER_LAYER = 'var markerLayer = L.layerGroup().addTo(map);';
+const MAP_RESIZE = MARKER_LAYER + `
+(function(){/*map-resize*/
+  var el = document.getElementById('map'), last = '';
+  function check(){
+    var key = el.clientWidth + 'x' + el.clientHeight;
+    if (!el.clientWidth || !el.clientHeight || key === last) return;
+    last = key;
+    map.invalidateSize(false);
+    if (typeof rebuild === 'function') { rebuild(); if (typeof postVisible === 'function') postVisible(); }
+  }
+  if (window.ResizeObserver) new ResizeObserver(check).observe(el);
+  var n = 0, t = setInterval(function(){ check(); if (++n > 40) clearInterval(t); }, 250);
+  window.addEventListener('load', check);
+})();`;
+function patchMapResize(doc) {
+  const mOpen = '<script type="__bundler/template">';
+  const ms = doc.indexOf(mOpen);
+  if (ms === -1) return { doc, changed: false };
+  const mStart = ms + mOpen.length;
+  const mEnd = doc.indexOf('</script>', mStart);
+  let tpl = JSON.parse(doc.slice(mStart, mEnd));
+  if (tpl.includes('/*map-resize*/')) return { doc, changed: false };
+  if (tpl.split(MARKER_LAYER).length !== 2) throw new Error('marker layer anchor not found exactly once — map page changed?');
+  tpl = tpl.replace(MARKER_LAYER, () => MAP_RESIZE);
+  const tjson = JSON.stringify(tpl).replace(/<\//g, '<\\/');
+  return { doc: doc.slice(0, mStart) + tjson + doc.slice(mEnd), changed: true };
+}
+
+// Every patch the map page gets, in order. Each is guarded, so this is safe on
+// a page that already carries some or all of them.
+function patchMapChain(inner) {
+  const res = swapAirports(inner);
+  const mapped = patchMapDoc(res.doc);
+  if (mapped.changed) console.log('applied 25-marker map cap to map page');
+  const styled = patchMapTableau(mapped.doc);
+  if (styled.changed) console.log('applied tableau-style clusters to map page');
+  const scaled = patchMapZoomCap(styled.doc);
+  if (scaled.changed) console.log('applied zoom-scaled marker cap');
+  const legended = patchMapLegend(scaled.doc);
+  if (legended.changed) console.log('applied airport-category colors + legend');
+  const zoomed = patchMapZoomPos(legended.doc);
+  if (zoomed.changed) console.log('moved map zoom control to bottom-right');
+  const typed = patchMapBrandType(zoomed.doc);
+  if (typed.changed) console.log('applied brand type to map page');
+  const dark = patchMapDark(typed.doc);
+  if (dark.changed) console.log('applied dark navy style + route arcs to map page');
+  const provided = patchMapProvider(dark.doc);
+  if (provided.changed) console.log('applied tile provider switch (Mapbox when a token is injected)');
+  const resized = patchMapResize(provided.doc);
+  if (resized.changed) console.log('applied container size watcher to map page');
+  const changed = [res, mapped, styled, scaled, legended, zoomed, typed, dark, provided, resized].some((r) => r.changed);
+  return { doc: resized.doc, changed };
+}
+
 function swapAirports(doc) {
   const mOpen = '<script type="__bundler/manifest">';
   const ms = doc.indexOf(mOpen);
@@ -1759,23 +1848,9 @@ function swapAirports(doc) {
       }
     } else if (entry.mime === 'text/html') {
       const inner = (entry.compressed ? zlib.gunzipSync(buf) : buf).toString('utf8');
-      const res = swapAirports(inner);
-      const mapped = patchMapDoc(res.doc);
-      if (mapped.changed) console.log('applied 25-marker map cap to nested map page');
-      const styled = patchMapTableau(mapped.doc);
-      if (styled.changed) console.log('applied tableau-style clusters to nested map page');
-      const scaled = patchMapZoomCap(styled.doc);
-      if (scaled.changed) console.log('applied zoom-scaled marker cap');
-      const legended = patchMapLegend(scaled.doc);
-      if (legended.changed) console.log('applied airport-category colors + legend');
-      const zoomed = patchMapZoomPos(legended.doc);
-      if (zoomed.changed) console.log('moved map zoom control to bottom-right');
-      const typed = patchMapBrandType(zoomed.doc);
-      if (typed.changed) console.log('applied brand type to nested map page');
-      const dark = patchMapDark(typed.doc);
-      if (dark.changed) console.log('applied dark navy style + route arcs to nested map page');
-      if (res.changed || mapped.changed || styled.changed || scaled.changed || legended.changed || zoomed.changed || typed.changed || dark.changed) {
-        entry.data = zlib.gzipSync(Buffer.from(dark.doc, 'utf8')).toString('base64');
+      const done = patchMapChain(inner);
+      if (done.changed) {
+        entry.data = zlib.gzipSync(Buffer.from(done.doc, 'utf8')).toString('base64');
         entry.compressed = true;
         changed = true;
       }
@@ -1789,6 +1864,46 @@ const swapped = swapAirports(out);
 if (swapped.changed) {
   out = swapped.doc;
   console.log('swapped airports dataset into bundle manifests');
+}
+
+// The map page lives at public/map.html and is served by the worker at
+// /map.html: session-gated, with the tile provider's key injected, and with a
+// referrer policy that lets the browser name our origin to the tile server (a
+// blob: document never can). A bundle from before this carries the page in
+// its manifest: it is taken out once, which also removes ~400KB from app.html,
+// and from then on the file is what the map patches run on.
+const MAP_FILE = path.join(root, 'public', 'map.html');
+{
+  const mOpen = '<script type="__bundler/manifest">';
+  const ms = out.indexOf(mOpen);
+  const mStart = ms + mOpen.length;
+  const mEnd = out.indexOf('</script>', mStart);
+  const manifest = JSON.parse(out.slice(mStart, mEnd));
+  const mapId = Object.keys(manifest).find((k) => manifest[k].mime === 'text/html');
+  if (mapId) {
+    const entry = manifest[mapId];
+    const buf = Buffer.from(entry.data, 'base64');
+    const inner = (entry.compressed ? zlib.gunzipSync(buf) : buf).toString('utf8');
+    fs.writeFileSync(MAP_FILE, patchMapChain(inner).doc);
+    delete manifest[mapId];
+    out = out.slice(0, mStart) + JSON.stringify(manifest).replace(/<\//g, '<\\/') + out.slice(mEnd);
+    const eOpen = '<script type="__bundler/ext_resources">';
+    const es = out.indexOf(eOpen);
+    if (es !== -1) {
+      const eStart = es + eOpen.length;
+      const eEnd = out.indexOf('</script>', eStart);
+      const ext = JSON.parse(out.slice(eStart, eEnd)).filter((r) => r.uuid !== mapId);
+      out = out.slice(0, eStart) + JSON.stringify(ext).replace(/<\//g, '<\\/') + out.slice(eEnd);
+    }
+    console.log('moved the map page out of the bundle into public/map.html');
+  } else {
+    const before = fs.readFileSync(MAP_FILE, 'utf8');
+    const after = patchMapChain(before);
+    if (after.changed) {
+      fs.writeFileSync(MAP_FILE, after.doc);
+      console.log('patched public/map.html');
+    }
+  }
 }
 
 // Outer-document script: inline scripts inside the design template never
