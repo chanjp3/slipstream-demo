@@ -383,6 +383,7 @@ class Component extends DCLogic {
   acceptQuote(reqId, quoteId) {
     this.api('/api/requests/' + reqId + '/accept', { body: { quoteId } }).then(() => {
       this.setState({ accepted: { ...this.state.accepted, [reqId]: quoteId } });
+      this.loadData(); // the operator's identity and certificate are revealed now, not at the next poll
     }).catch(e => alert(e.message));
   }
   submitBid(rfq) {
@@ -1286,6 +1287,8 @@ class Component extends DCLogic {
         const isAcc = acceptedId === q.id;
         return {
           op: q.op, safety: q.safety, photo: q.photo || false,
+          // accepted offer only: the certificate holder's name and number as the FAA lists them
+          opLegal: q.opLegal || false, opCert: q.opCert || '',
           art: this.acArt(this.acClass(q.aircraft, q.seats)),
           artLabel: { prop: 'TURBOPROP', light: 'LIGHT CABIN', mid: 'MID CABIN', heavy: 'LARGE CABIN' }[this.acClass(q.aircraft, q.seats)],
           aircraft: q.aircraft, year: q.year, seats: q.seats,

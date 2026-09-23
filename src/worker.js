@@ -1610,7 +1610,11 @@ async function tripDocPage(request, env, session, requestId) {
 
   const op = await getOperatorProfile(env, q.org);
   const company = (op.profile && op.profile.company) || q.operator_name;
-  const cert = op.profile && op.profile.cert_number;
+  // The carrier in operational control, named as the FAA lists the Part 135
+  // certificate holder (14 CFR 295.24(a)(1)). A number that is not on that
+  // list is never presented as the certificate the flight operates under.
+  const legal = (op.profile && op.profile.cert_faa_name) || '';
+  const cert = legal ? op.profile.cert_number : '';
   const legs = JSON.parse(req.legs || '[]');
   const list = (s) => { try { return JSON.parse(s || '[]'); } catch (e) { return []; } };
 
@@ -1638,6 +1642,7 @@ async function tripDocPage(request, env, session, requestId) {
     + '<div class="status s-' + status + '">' + escHtml(status.toUpperCase()) + '</div>'
     + '<h1>' + escHtml(title) + '</h1><p class="lead">' + escHtml(statusNote) + '</p>'
     + '<div class="route">' + escHtml(routeOfLegs(req.type, legs)) + '</div>'
+    + (legal ? '<p class="carrier">Operated by <b>' + escHtml(legal) + '</b>, FAA Part 135 certificate <b class="mono">' + escHtml(cert) + '</b></p>' : '')
     + '<section><div class="k">Itinerary</div><table class="legs"><thead><tr><th>Leg</th><th>Date</th><th>Departs</th><th>From</th><th>To</th></tr></thead><tbody>'
     + legs.map((l, i) => '<tr><td>' + (i + 1) + '</td><td>' + escHtml(fmtLegDate(l.date)) + '</td><td>' + escHtml(l.time ? l.time + ' local' : '—') + '</td><td class="code">' + escHtml(l.from) + '</td><td class="code">' + escHtml(l.to) + '</td></tr>').join('')
     + '</tbody></table></section>'
@@ -1656,11 +1661,20 @@ async function tripDocPage(request, env, session, requestId) {
     + '<div><div class="k">Chartavia</div>' + kv([['Platform fee', fee], ['Contract', q.contract_type ? (q.contract_name || 'On file') + ' (in the conversation)' : 'Shared in the conversation when ready'], ['Reference', req.id]]) + '</div></section>'
     + '<p class="fine">This document summarizes a charter arranged on Chartavia. The charter agreement between the traveler and the operator governs the flight, including price, payment, cancellation and liability. '
     + 'Chartavia is a marketplace. It is not a direct or indirect air carrier and does not operate aircraft. '
-    + (cert ? 'The flight is operated by ' + escHtml(company) + ' under FAA Part 135 air carrier certificate ' + escHtml(cert) + '.' : 'The flight is operated by ' + escHtml(company) + ', the certificate holder.')
+    + (legal
+      ? 'The flight is operated by ' + escHtml(legal) + (sameName(legal, company) ? '' : ', which appears on Chartavia as ' + escHtml(company) + ',')
+        + ' under FAA Part 135 air carrier certificate ' + escHtml(cert) + '.'
+      : 'The flight is operated by ' + escHtml(company) + ', the certificate holder.')
     + ' Questions: message your ' + (isOperator ? 'client' : 'operator') + ' in Chartavia, or reach the concierge from the app.</p>'
     + '<p class="gen">Generated ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC</p></div>';
 
   return page(tripDocShell(title + ' ' + req.id, body, req.id));
+}
+
+// "MERIDIAN JET GROUP, LLC" and "Meridian Jet Group LLC" are one name.
+function sameName(a, b) {
+  const key = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return key(a) === key(b);
 }
 
 function tripDocShell(title, body, ref) {
@@ -1694,6 +1708,7 @@ h1{font-family:'Quicksand','Albert Sans',sans-serif;font-size:27px;font-weight:7
 .status{display:inline-block;font-family:'Quicksand',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:1.8px;padding:4px 11px;border-radius:999px;background:#eef3fd;color:var(--blue)}
 .s-confirmed,.s-completed{background:#e8f6ee;color:#1e5e3c}.s-cancelled{background:#fdecec;color:#b3261e}
 .route{font-family:ui-monospace,Menlo,monospace;font-size:30px;font-weight:700;letter-spacing:-.5px;margin-top:20px}
+.carrier{margin-top:8px;font-size:14px;color:var(--slate);line-height:1.55}.carrier b{color:var(--navy);font-weight:700}.carrier .mono{font-family:ui-monospace,Menlo,monospace}
 section{margin-top:28px}
 .k{font-family:'Quicksand',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:2.2px;color:var(--gold-ink);text-transform:uppercase;display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .k::before{content:'';width:24px;height:1px;background:var(--gold)}
@@ -2007,9 +2022,16 @@ function quoteShape(q, anon) {
     acSeats = fleet.seats;
   }
   const badge = verificationBadge(q.cert_number !== undefined ? q : null);
+  // 14 CFR 295.24(a)(1): before the traveler signs the charter agreement, name
+  // the carrier in operational control. cert_faa_name is the certificate
+  // holder's name on the FAA's Part 135 list, set only while cert_number
+  // matches that list, so the pair is never an unverified claim.
+  const carrier = revealed && q.cert_faa_name ? { legal: q.cert_faa_name, cert: q.cert_number } : null;
   return {
     id: q.id,
     op: revealed ? (q.op_company || q.operator_name) : anon.label,
+    opLegal: carrier ? carrier.legal : null,
+    opCert: carrier ? carrier.cert : null,
     safety: q.safety_program || badge,
     verif: badge,
     photo: revealed && q.photo_ac_id ? '/api/fleet/' + q.photo_ac_id + '/photo' : false,

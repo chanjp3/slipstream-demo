@@ -1421,6 +1421,20 @@ if (!newTemplate.includes('{{ canResubmit }}')) {
   console.log('applied rating expiry + resubmission markup patch');
 }
 
+// Air charter broker disclosure, 14 CFR 295.24(a)(1): the accepted offer names
+// the carrier in operational control as the FAA lists the certificate holder,
+// with its Part 135 certificate. The server sends both only after acceptance.
+const OFFER_SPEC = '<div style="font-size:13px;color:#4a5a76;margin-top:3px">{{ q.spec }}</div>';
+const OFFER_CARRIER = OFFER_SPEC + `
+                <sc-if value="{{ q.opLegal }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:12px;color:#4a5a76;line-height:1.5;margin-top:4px">Operated by <b style="color:#16233b">{{ q.opLegal }}</b>, FAA Part 135 certificate <b style="color:#16233b;font-family:ui-monospace,Menlo,monospace">{{ q.opCert }}</b></div>
+                </sc-if>`;
+if (!newTemplate.includes('{{ q.opLegal }}')) {
+  if (newTemplate.split(OFFER_SPEC).length !== 2) throw new Error('offer spec line not found exactly once — template changed?');
+  newTemplate = newTemplate.replace(OFFER_SPEC, () => OFFER_CARRIER);
+  console.log('applied operating-carrier disclosure markup patch');
+}
+
 // Brand type: Quicksand for display text (headings, buttons, anything set
 // bold); Albert Sans stays for running text and inputs. The framework
 // re-serializes inline styles at runtime, hence the spaced "font-weight: 800".
