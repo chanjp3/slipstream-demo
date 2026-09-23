@@ -48,6 +48,12 @@
     }
     .alt { margin-top: 20px; text-align: center; font-size: 14px; color: #68758d; }
     .alt a { color: #2E6BE6; font-weight: 600; text-decoration: none; }
+    .legal-links { margin-top: 16px; text-align: center; font-size: 12px; color: #a9b4c8; }
+    .legal-links a { color: #8593ab; font-weight: 600; text-decoration: none; margin: 0 7px; }
+    .legal-links a:hover { color: #16233b; }
+    .consent { margin-top: 16px; font-size: 12.5px; line-height: 1.55; color: #68758d; }
+    .consent a { color: #2E6BE6; font-weight: 600; text-decoration: none; }
+    .consent + button[type="submit"] { margin-top: 14px; }
   </style>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
@@ -73,6 +79,7 @@
     </form>
     <div class="alt"><a href="/forgot">Forgot password?</a></div>
     <div class="alt" style="margin-top:8px">New to Chartavia? <a href="/register">Create an account</a></div>
+    <div class="legal-links"><a href="/terms">Terms</a><span aria-hidden="true">·</span><a href="/privacy">Privacy</a></div>
   </div>
   <script>
     const form = document.getElementById('form');

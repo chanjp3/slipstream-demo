@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy · Chartavia</title>
+  <meta name="description" content="What information Chartavia collects, how we use and share it, and the choices you have.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#16233b">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue: #2E6BE6; --blue-dark: #2459c9; --navy: #16233b; --sky-wash: #eef3fd; --slate: #4a5a76;
+      --gold: #c6a667; --gold-ink: #8a6b2e; --gold-soft: #dcc48f; --ivory: #f8f6f1;
+      --mist: #68758d; --line: #e8e3d9;
+      --display: 'Quicksand', 'Albert Sans', -apple-system, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Albert Sans', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--navy); background: var(--ivory); }
+    a { text-decoration: none; color: inherit; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+    /* nav, as on the landing page */
+    .nav { position: sticky; top: 0; z-index: 100; background: rgba(248,246,241,.92); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(232,227,217,.9); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-mark { display: flex; }
+    .logo-mark svg { width: 34px; height: 34px; display: block; }
+    .logo-word { display: flex; color: var(--navy); }
+    .logo-word svg { display: block; }
+    .nav-links { display: flex; gap: 26px; font-family: var(--display); font-size: 14.5px; font-weight: 700; color: var(--slate); }
+    .nav-links a { padding: 4px 0; }
+    .nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--navy); }
+    .nav-links a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--gold); }
+    .nav-cta { display: flex; gap: 10px; align-items: center; }
+    .btn { display: inline-block; border-radius: 999px; font-family: var(--display); font-weight: 700; cursor: pointer; transition: transform .12s, background .15s; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-ghost { padding: 9px 16px; font-size: 14px; color: var(--navy); border: 1.5px solid var(--line); background: #fff; }
+    .btn-primary { padding: 10px 18px; font-size: 14px; color: #fff; background: var(--blue); box-shadow: 0 6px 18px rgba(46,107,230,.28); }
+    .btn-primary:hover { background: var(--blue-dark); }
+
+    /* page head */
+    .legal-head { background: var(--navy); color: #fff; border-bottom: 1px solid rgba(198,166,103,.45); }
+    .legal-head .wrap { padding-top: 60px; padding-bottom: 52px; }
+    .kicker { display: flex; align-items: center; gap: 12px; font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: 3px; color: var(--gold-soft); }
+    .kicker::before { content: ''; width: 28px; height: 1px; background: var(--gold); }
+    .legal-head h1 { font-family: var(--display); font-size: 46px; line-height: 1.08; letter-spacing: -1.2px; margin-top: 14px; }
+    .updated { margin-top: 12px; font-size: 14px; color: #aebbd6; }
+    .lede { margin-top: 20px; max-width: 760px; font-size: 17px; line-height: 1.7; color: #dfe7f5; }
+    .lede a { color: #fff; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,.45); }
+
+    /* body */
+    .legal-body { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 64px; padding-top: 52px; padding-bottom: 80px; }
+    .toc { position: sticky; top: 92px; align-self: start; max-height: calc(100vh - 116px); overflow-y: auto; padding-right: 6px; }
+    .toc-title { font-family: var(--display); font-size: 11.5px; font-weight: 700; letter-spacing: 2.2px; color: var(--gold-ink); margin-bottom: 12px; }
+    .toc ol, .toc-mobile ol { list-style: none; }
+    .toc a { display: block; padding: 6px 0 6px 14px; border-left: 2px solid var(--line); font-size: 13.5px; line-height: 1.35; font-weight: 600; color: var(--mist); }
+    .toc a:hover { color: var(--navy); border-left-color: var(--gold); }
+    .toc-mobile { display: none; }
+    .doc { max-width: 760px; min-width: 0; }
+    .doc section { scroll-margin-top: 88px; margin-bottom: 42px; }
+    .doc h2 { font-family: var(--display); font-size: 25px; line-height: 1.2; letter-spacing: -.3px; margin-bottom: 14px; }
+    .doc h2 .num { color: var(--gold-ink); margin-right: 8px; }
+    .doc h3 { font-size: 16.5px; font-weight: 700; margin: 24px 0 8px; }
+    .doc p, .doc li { font-size: 15.5px; line-height: 1.75; color: var(--slate); }
+    .doc p + p, .doc ul + p, .doc p + ul { margin-top: 12px; }
+    .doc ul { padding-left: 20px; }
+    .doc li + li { margin-top: 8px; }
+    .doc li::marker { color: var(--gold); }
+    .doc a { color: var(--blue); font-weight: 600; }
+    .doc a:hover { text-decoration: underline; }
+    .doc strong { color: var(--navy); font-weight: 700; }
+    .doc code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--navy); }
+    .callout { background: #fff; border: 1.5px solid var(--line); border-left: 4px solid var(--gold); border-radius: 16px; padding: 26px 28px; margin-bottom: 46px; box-shadow: 0 12px 34px rgba(22,35,59,.06); scroll-margin-top: 88px; }
+    .callout h2 { font-size: 21px; }
+
+    /* footer */
+    footer { padding: 44px 0 56px; color: var(--mist); font-size: 13.5px; border-top: 1px solid var(--line); }
+    .foot-inner { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .foot-links { display: flex; flex-wrap: wrap; gap: 10px 22px; font-weight: 600; }
+    .foot-links a:hover { color: var(--navy); }
+    .foot-legal { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; line-height: 1.65; color: var(--mist); max-width: 820px; }
+
+    @media (max-width: 960px) {
+      .legal-body { grid-template-columns: 1fr; gap: 0; padding-top: 28px; }
+      .toc { display: none; }
+      .toc-mobile { display: block; margin-bottom: 34px; background: #fff; border: 1.5px solid var(--line); border-radius: 14px; }
+      .toc-mobile summary { cursor: pointer; padding: 15px 18px; font-family: var(--display); font-weight: 700; font-size: 15px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+      .toc-mobile summary::-webkit-details-marker { display: none; }
+      .toc-mobile summary::after { content: '+'; color: var(--gold-ink); font-size: 20px; line-height: 1; }
+      .toc-mobile[open] summary::after { content: '\2013'; }
+      .toc-mobile ol { padding: 0 18px 12px; }
+      .toc-mobile a { display: block; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; font-weight: 600; color: var(--slate); }
+    }
+    @media (max-width: 860px) { .nav-links { display: none; } }
+    @media (max-width: 640px) {
+      .logo { gap: 8px; }
+      .logo-mark svg { width: 30px; height: 30px; }
+      .logo-word svg { height: 13px; width: auto; }
+      .nav-cta { gap: 6px; }
+      .nav-cta .btn { padding: 8px 13px; font-size: 13px; }
+      .wrap { padding: 0 22px; }
+      .legal-head .wrap { padding-top: 42px; padding-bottom: 38px; }
+      .legal-head h1 { font-size: 34px; letter-spacing: -.8px; }
+      .lede { font-size: 16px; }
+      .callout { padding: 22px 20px; }
+      .doc h2 { font-size: 22px; }
+      .doc p, .doc li { font-size: 15px; }
+      .foot-inner { flex-direction: column; align-items: flex-start; gap: 14px; }
+    }
+    @media print {
+      .nav, .toc, .toc-mobile, .foot-links { display: none !important; }
+      body { background: #fff; }
+      .legal-head { background: none; color: var(--navy); border: none; }
+      .legal-head .wrap { padding: 0 0 18px; }
+      .lede, .updated { color: var(--slate); }
+      .lede a { color: var(--navy); }
+      .legal-body { display: block; padding: 0; }
+      .callout { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="/" aria-label="Chartavia home">
+      <span class="logo-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="34" height="34" role="img" aria-label="Chartavia"><rect width="512" height="512" rx="116" fill="#2E6BE6"/><g transform="rotate(45 256 256) translate(256 256) scale(1.04) translate(-256 -262)"><g><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><g transform="translate(512 0) scale(-1 1)"><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><path d="M256,40 C276,70 282,118 282,166 L282,398 C282,432 268,456 256,470 C244,456 230,432 230,398 L230,166 C230,118 236,70 256,40 Z" fill="#fff"/></g></svg></span>
+      <span class="logo-word"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 823.94 100" width="123.59" height="15" role="img" aria-label="Chartavia"><g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 0)"><path d="M82.94,22.36 A43,43 0 1 0 82.94,77.64"/></g><g transform="translate(113.94 0)"><path d="M7,7 V93"/><path d="M73,7 V93"/><path d="M7,50 H73"/></g><g transform="translate(213.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(321.94 0)"><path d="M7,93 V7 H42 A24.5,24.5 0 0 1 42,56 H7"/><path d="M36,56 L71,93"/></g><g transform="translate(417.94 0)"><path d="M7,7 H75"/><path d="M41,7 V93"/></g><g transform="translate(505.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(597.94 0)"><path d="M7,7 L45,93 L83,7"/></g><g transform="translate(703.94 0)"><path d="M7,7 V93"/></g><g transform="translate(733.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g></g></svg></span>
+    </a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy" aria-current="page">Privacy</a>
+      <a href="/concierge">Contact</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="https://slipstream.chandler-850.workers.dev/login">Sign in</a>
+      <a class="btn btn-primary" href="https://slipstream.chandler-850.workers.dev/register">Get started</a>
+    </div>
+  </div>
+</nav>
+
+<header class="legal-head">
+  <div class="wrap">
+    <div class="kicker">LEGAL</div>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated September 23, 2026</p>
+    <p class="lede">This Privacy Policy explains what information Chartavia collects, how we use and share it, and the choices you have. Chartavia is operated by Sapphire Productions, LLC, a Florida limited liability company (“Chartavia,” “we,” “us” or “our”). The policy covers our website, web app, emails and contact page. Our <a href="/terms">Terms of Service</a> set out the rules for using Chartavia.</p>
+  </div>
+</header>
+
+<main class="wrap legal-body">
+  <nav class="toc" aria-label="Contents">
+    <div class="toc-title">CONTENTS</div>
+    <ol><li><a href="#summary">The short version</a></li><li><a href="#collect">1. Information we collect</a></li><li><a href="#use">2. How we use information</a></li><li><a href="#share">3. How we share information</a></li><li><a href="#retention">4. How long we keep information</a></li><li><a href="#cookies">5. Cookies</a></li><li><a href="#security">6. Security</a></li><li><a href="#rights">7. Your choices and rights</a></li><li><a href="#children">8. Children</a></li><li><a href="#international">9. Using Chartavia outside the United States</a></li><li><a href="#demo">10. The interactive demo</a></li><li><a href="#changes">11. Changes to this policy</a></li><li><a href="#contact">12. Contact us</a></li></ol>
+  </nav>
+  <div class="doc">
+    <details class="toc-mobile"><summary>Contents</summary><ol><li><a href="#summary">The short version</a></li><li><a href="#collect">1. Information we collect</a></li><li><a href="#use">2. How we use information</a></li><li><a href="#share">3. How we share information</a></li><li><a href="#retention">4. How long we keep information</a></li><li><a href="#cookies">5. Cookies</a></li><li><a href="#security">6. Security</a></li><li><a href="#rights">7. Your choices and rights</a></li><li><a href="#children">8. Children</a></li><li><a href="#international">9. Using Chartavia outside the United States</a></li><li><a href="#demo">10. The interactive demo</a></li><li><a href="#changes">11. Changes to this policy</a></li><li><a href="#contact">12. Contact us</a></li></ol></details>
+
+    <div class="callout" id="summary">
+      <h2>The short version</h2>
+      <ul>
+      <li>We collect what we need to run the marketplace: your account, trip requests, offers, messages and reviews, and operators' verification documents.</li>
+      <li>Operators see your trip details, but only your first name and last initial, until you accept one of their offers. Other operators never learn who you are.</li>
+      <li>We don't sell your personal information, and we don't use advertising or analytics trackers.</li>
+      <li>We use one cookie, and its only job is keeping you signed in.</li>
+      <li>You can ask us for a copy of your information, or to correct or delete it, at any time.</li>
+      </ul>
+    </div>
+
+      <section id="collect">
+        <h2><span class="num">1.</span>Information we collect</h2>
+        <h3>1.1 Information you give us</h3>
+        <ul>
+        <li><strong>Account.</strong> Your name, email address, password, whether you're a traveler or an operator, and your settings. We store your password only as a salted hash, never in readable form.</li>
+        <li><strong>Trip requests.</strong> Airports, dates and times, number of passengers, aircraft categories, budget, flexibility, add-ons such as catering or ground transport, notes, and special needs you flag, such as pets, extra baggage, medical equipment or wheelchair access.</li>
+        <li><strong>Offers, trips and messages.</strong> Offers you send or receive, trips you accept, messages in Chartavia's chat, and charter agreements an operator uploads for your trip.</li>
+        <li><strong>Reviews.</strong> The star rating and comments you leave after a completed trip.</li>
+        <li><strong>Operator information.</strong> Company name, FAA certificate number, home base, team members, aircraft tail numbers and models, aircraft photos, empty-leg listings, and the documents you upload, such as your air carrier certificate, D085 aircraft listing and safety audit certificates.</li>
+        <li><strong>Contact requests.</strong> The name, email address, phone number and message you send through our contact page.</li>
+        <li><strong>Plans.</strong> Whether you're on a paid plan, such as Chartavia Plus or Operator Pro.</li>
+        </ul>
+        <p>Some special needs, such as medical equipment or wheelchair access, can reveal information about your health. Share only what an operator needs to plan your flight. We use it only to arrange your trip, and we show it only to operators who can quote it.</p>
+        <h3>1.2 Information collected automatically</h3>
+        <ul>
+        <li><strong>Sign-in cookie.</strong> Keeps you signed in. See <a href="#cookies">section 5</a>.</li>
+        <li><strong>IP address.</strong> We use it to limit repeated attempts, such as sign-in and sign-up attempts, and to protect Chartavia from abuse. These counters are kept only briefly and are deleted automatically.</li>
+        <li><strong>Server logs.</strong> Our hosting provider, Cloudflare, records technical details of requests, such as IP address, browser type, the page requested and the time, to deliver and protect the service.</li>
+        <li><strong>Email records.</strong> We record which notification emails we've sent you so we don't send duplicates. When an email can't be delivered, we may keep a copy so our team can follow up.</li>
+        <li><strong>App files.</strong> Our web app stores a few files, such as icons, on your device so it can be installed and load faster. These files contain no personal information.</li>
+        </ul>
+        <h3>1.3 Information from other sources</h3>
+        <ul>
+        <li><strong>Public FAA records.</strong> The FAA's list of Part 135 certificate holders and their aircraft, and the FAA aircraft registry, which we use to check operators and aircraft.</li>
+        <li><strong>Other users.</strong> Travelers review operators, and operator administrators invite team members.</li>
+        <li><strong>Our team.</strong> Notes and decisions made while reviewing operators, confirming safety ratings and answering contact requests.</li>
+        </ul>
+      </section>
+
+      <section id="use">
+        <h2><span class="num">2.</span>How we use information</h2>
+        <ul>
+        <li><strong>To run Chartavia:</strong> creating and securing accounts, delivering requests to operators, showing offers, revealing names when an offer is accepted, carrying messages and keeping trip records.</li>
+        <li><strong>To check operators and keep the marketplace fair:</strong> verifying certificates, aircraft and safety ratings, hiding contact details before an offer is accepted, and preventing abuse.</li>
+        <li><strong>To communicate with you:</strong> emails about your account and trips, such as password resets, new offers and messages, trip updates, verification results and rating renewal reminders, and replies to your contact requests. We don't send marketing emails.</li>
+        <li><strong>To show figures about the marketplace,</strong> such as the number of verified operators, quotes per request and response times. These figures don't identify travelers.</li>
+        <li><strong>To meet legal duties and protect rights,</strong> such as broker disclosure and record-keeping duties, tax and accounting, responding to lawful requests and enforcing our Terms.</li>
+        <li><strong>To improve Chartavia,</strong> using our own records to understand how features are used. We don't use third-party analytics.</li>
+        </ul>
+      </section>
+
+      <section id="share">
+        <h2><span class="num">3.</span>How we share information</h2>
+        <h3>3.1 Between travelers and operators</h3>
+        <ul>
+        <li><strong>Before you accept an offer,</strong> operators who can quote your trip see its details and your first name and last initial. They don't see your full name or email address.</li>
+        <li><strong>When you accept an offer,</strong> that operator's team sees your name and trip details and can message you in Chartavia. You see the operator's name, its aircraft, including the tail number and photos, and its messages. The other operators never learn who you are.</li>
+        <li><strong>Operators' details.</strong> Before acceptance, travelers see each offer under a label such as “Operator A,” with its safety rating, verification status, average rating, number of reviews and response time. The operator's name is shown after acceptance, and aircraft photos an operator uploads are shown to travelers.</li>
+        <li><strong>Reviews.</strong> Other users see an operator's average rating and number of reviews, not who wrote them.</li>
+        <li><strong>Empty legs</strong> appear on the empty-leg board without the operator's name.</li>
+        <li><strong>Operator teams.</strong> Members of an operator's team share its offers, trips and messages.</li>
+        </ul>
+        <h3>3.2 Service providers</h3>
+        <p>We use these companies to run Chartavia. They may use information only to provide their services to us.</p>
+        <ul>
+        <li><strong>Cloudflare</strong> hosts Chartavia and provides our database, file storage, network security and logs.</li>
+        <li><strong>Resend</strong> delivers our emails.</li>
+        <li><strong>Mapbox</strong> provides the airport map. Your browser loads map images directly from Mapbox, which receives your IP address and browser details. If Mapbox is unavailable, map images come from OpenStreetMap.</li>
+        <li><strong>Google Fonts</strong> provides the fonts on our pages. Your browser loads them from Google, which receives your IP address and browser details.</li>
+        <li><strong>A payment processor,</strong> once we start charging, will receive your payment details directly. We won't store full card numbers.</li>
+        </ul>
+        <h3>3.3 Legal reasons</h3>
+        <p>We may disclose information when we believe the law or legal process requires it, including requests from the FAA or the U.S. Department of Transportation, or when it's needed to protect the rights, property or safety of our users, the public or Chartavia, or to enforce our Terms.</p>
+        <h3>3.4 Business changes</h3>
+        <p>If Chartavia is sold, merged or reorganized, information may be transferred to the new owner, who must continue to protect it as this policy describes.</p>
+        <p><strong>We don't sell personal information,</strong> share it for targeted advertising, or give it to data brokers.</p>
+      </section>
+
+      <section id="retention">
+        <h2><span class="num">4.</span>How long we keep information</h2>
+        <ul>
+        <li><strong>Accounts and marketplace records</strong> are kept while your account is open. After you close your account, we delete or de-identify your personal information within 30 days, except records we must keep for legal, tax, accounting, dispute or broker purposes, such as trip, offer and deposit records. We keep those only as long as those purposes require.</li>
+        <li><strong>Sign-in sessions</strong> expire after 7 days, and <strong>password reset links</strong> after 30 minutes.</li>
+        <li><strong>Abuse-prevention counters</strong> are deleted automatically soon after they're created.</li>
+        <li><strong>Server logs</strong> are kept by Cloudflare for a short period.</li>
+        <li><strong>Backups</strong> may hold copies of deleted information for a limited time before they're overwritten.</li>
+        </ul>
+      </section>
+
+      <section id="cookies">
+        <h2><span class="num">5.</span>Cookies</h2>
+        <p>We use one cookie, called <code>slipstream_session</code>. It's essential: it keeps you signed in, expires after 7 days or when you sign out, and can't be read by scripts on the page. We don't use advertising, analytics or tracking cookies, and our pages don't include third-party advertising or analytics code.</p>
+        <p>We don't track you across other websites. We treat Global Privacy Control signals as a request to opt out of the sale or sharing of personal information, which we don't do in any case.</p>
+      </section>
+
+      <section id="security">
+        <h2><span class="num">6.</span>Security</h2>
+        <ul>
+        <li>Every page and request uses an encrypted HTTPS connection.</li>
+        <li>Passwords are stored only as salted hashes, made with PBKDF2 and 100,000 iterations.</li>
+        <li>The sign-in cookie is marked Secure and HttpOnly.</li>
+        <li>Operators' documents are stored privately. Only that operator's team and authorized Chartavia staff can open them. A charter agreement can be opened only by the traveler and the operator on that trip, and by authorized staff.</li>
+        <li>Repeated sign-in attempts are limited, and contact details are hidden in operator messages until an offer is accepted.</li>
+        </ul>
+        <p>No system is perfectly secure. If a security breach affects your personal information, we'll notify you as the law requires.</p>
+      </section>
+
+      <section id="rights">
+        <h2><span class="num">7.</span>Your choices and rights</h2>
+        <ul>
+        <li><strong>Access and correction.</strong> You can change your name and password in the account menu. For anything else, contact us.</li>
+        <li><strong>Deletion.</strong> You can ask us to close your account and delete your personal information through our <a href="/concierge">contact page</a>. We'll confirm the request came from you before acting on it. Some records may be kept as <a href="#retention">section 4</a> explains.</li>
+        <li><strong>A copy of your information.</strong> Ask us, and we'll send you a copy in a common format.</li>
+        <li><strong>Emails.</strong> Our emails are about your account and your trips, so they continue while your account is open.</li>
+        </ul>
+        <p>Depending on where you live, you may have rights to know, access, correct, delete or get a copy of your personal information, and to opt out of its sale, sharing or use for targeted advertising. We honor these requests for everyone, wherever they live, and we won't treat you differently for making one. We'll respond within 45 days. If we decline your request, you can appeal by replying to our decision. If we deny the appeal, you can contact your state attorney general.</p>
+      </section>
+
+      <section id="children">
+        <h2><span class="num">8.</span>Children</h2>
+        <p>Chartavia is for adults. You must be 18 or older to create an account, and we don't knowingly collect personal information from children under 13. Trip requests include only the number of passengers, not their names or ages. If you believe a child has given us personal information, contact us and we'll delete it.</p>
+      </section>
+
+      <section id="international">
+        <h2><span class="num">9.</span>Using Chartavia outside the United States</h2>
+        <p>Chartavia is run from the United States. If you use it from another country, your information will be processed in the United States and wherever our service providers operate, where privacy laws may differ from those where you live. We process your information to provide the service you ask for, for our legitimate interest in running a safe and fair marketplace, to meet legal duties, and with your consent where the law requires it.</p>
+      </section>
+
+      <section id="demo">
+        <h2><span class="num">10.</span>The interactive demo</h2>
+        <p>Our interactive demo uses fictional sample accounts that any visitor can switch between. Anything you type there can be seen by other visitors, and demo data is reset from time to time. Don't enter real personal information in the demo.</p>
+      </section>
+
+      <section id="changes">
+        <h2><span class="num">11.</span>Changes to this policy</h2>
+        <p>We'll update this policy as Chartavia changes and post the new version with a new date. For material changes, we'll tell you by email or in the app before they take effect.</p>
+      </section>
+
+      <section id="contact">
+        <h2><span class="num">12.</span>Contact us</h2>
+        <p>Questions, or want to use your privacy rights? Reach us through our <a href="/concierge">contact page</a> and choose “Asking something else.” Chartavia is operated by Sapphire Productions, LLC, a Florida limited liability company.</p>
+      </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner">
+      <a class="logo" href="/" aria-label="Chartavia home">
+      <span class="logo-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="30" height="30" role="img" aria-label="Chartavia"><rect width="512" height="512" rx="116" fill="#2E6BE6"/><g transform="rotate(45 256 256) translate(256 256) scale(1.04) translate(-256 -262)"><g><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><g transform="translate(512 0) scale(-1 1)"><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><path d="M256,40 C276,70 282,118 282,166 L282,398 C282,432 268,456 256,470 C244,456 230,432 230,398 L230,166 C230,118 236,70 256,40 Z" fill="#fff"/></g></svg></span>
+      <span class="logo-word"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 823.94 100" width="107.11" height="13" role="img" aria-label="Chartavia"><g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 0)"><path d="M82.94,22.36 A43,43 0 1 0 82.94,77.64"/></g><g transform="translate(113.94 0)"><path d="M7,7 V93"/><path d="M73,7 V93"/><path d="M7,50 H73"/></g><g transform="translate(213.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(321.94 0)"><path d="M7,93 V7 H42 A24.5,24.5 0 0 1 42,56 H7"/><path d="M36,56 L71,93"/></g><g transform="translate(417.94 0)"><path d="M7,7 H75"/><path d="M41,7 V93"/></g><g transform="translate(505.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(597.94 0)"><path d="M7,7 L45,93 L83,7"/></g><g transform="translate(703.94 0)"><path d="M7,7 V93"/></g><g transform="translate(733.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g></g></svg></span>
+    </a>
+      <div class="foot-links">
+        <a href="/#how">How it works</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="/concierge">Contact</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="https://slipstream.chandler-850.workers.dev/login">Sign in</a>
+      </div>
+      <div>© 2026 Chartavia</div>
+    </div>
+    <p class="foot-legal">Chartavia is an air charter broker, not a direct air carrier. We don’t operate aircraft or hold operational control of any flight. Every flight is provided by a properly licensed direct air carrier operating under FAA Part 135.</p>
+  </div>
+</footer>
+
+</body>
+</html>

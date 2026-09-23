@@ -3,6 +3,9 @@
 
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 days
 const PBKDF2_ITERATIONS = 100_000;
+// Terms of Service version a new account accepts (public/terms.html, "Last updated").
+// Bump it when the Terms change materially; users.terms_version records it.
+const TERMS_VERSION = '2026-09-23';
 
 // ---------------------------------------------------------------- demo mode
 // This deployment is a guided demo: anyone can switch between seeded personas
@@ -159,6 +162,7 @@ async function handlePage(request, env, path) {
     }
 
     if (path === '/concierge') return serveAsset(env, request, '/concierge.html');
+    if (path === '/terms' || path === '/privacy') return serveAsset(env, request, path + '.html');
     const tripDoc = path.match(/^\/trip\/(RQ-\d+)$/);
     if (tripDoc) {
       if (!session) return redirect('/login');
@@ -362,8 +366,8 @@ async function apiRegister(request, env) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const hash = await hashPassword(password, salt);
   const res = await env.DB.prepare(
-    'INSERT INTO users (email, name, role, salt, hash) VALUES (?, ?, ?, ?, ?)'
-  ).bind(email, name, role, toHex(salt), toHex(hash)).run();
+    "INSERT INTO users (email, name, role, salt, hash, terms_version, terms_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))"
+  ).bind(email, name, role, toHex(salt), toHex(hash), TERMS_VERSION).run();
   const userId = res.meta.last_row_id;
 
   if (role === 'operator') {
@@ -1757,7 +1761,9 @@ function emailHtml(title, lines, ctaText, ctaUrl, opts) {
       + '<a href="' + escHtml(ctaUrl) + '" style="' + font + 'display:inline-block;padding:13px 28px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none">' + escHtml(ctaText || 'Open Chartavia') + '</a></td></tr></table>' : '')
     + '</td></tr>'
     + '<tr><td style="' + font + 'padding:20px 32px 0;font-size:11.5px;line-height:1.6;color:#8593ab">You received this because of your activity with Chartavia.<br>'
-    + 'Chartavia is a marketplace, not an air carrier. Flights are operated by FAA-certificated Part 135 operators.</td></tr>'
+    + 'Chartavia is an air charter broker, not a direct air carrier. Every flight is operated by an FAA-certificated Part 135 operator.'
+    + (origin ? '<br><a href="' + origin + '/terms" style="color:#8593ab">Terms of Service</a> &middot; <a href="' + origin + '/privacy" style="color:#8593ab">Privacy Policy</a>' : '')
+    + '</td></tr>'
     + '</table></td></tr></table></body></html>';
 }
 
@@ -2235,7 +2241,15 @@ async function apiTripAction(request, env, me, requestId) {
     if (cur === 'completed' || cur === 'cancelled') return json({ error: 'Trip is already ' + cur }, 409);
     next = 'cancelled';
   }
-  await env.DB.prepare('UPDATE requests SET trip_status = ? WHERE id = ?').bind(next, requestId).run();
+  // An operator calling off an accepted trip means it can't be flown for the
+  // traveler, so the deposit that became our fee at acceptance goes back
+  // (Terms 3.3). A traveler cancelling keeps it as the fee.
+  const refunded = next === 'cancelled' && isWinningOp && req.deposit_status === 'kept';
+  await env.DB.prepare(
+    `UPDATE requests SET trip_status = ?1,
+       deposit_status = CASE WHEN ?2 = 1 AND deposit_status = 'kept' THEN 'refunded' ELSE deposit_status END
+     WHERE id = ?3`
+  ).bind(next, refunded ? 1 : 0, requestId).run();
   {
     const origin = new URL(request.url).origin;
     const label = next === 'confirmed' ? 'Your trip is confirmed'
@@ -2243,7 +2257,7 @@ async function apiTripAction(request, env, me, requestId) {
       : 'Trip cancelled';
     const line = next === 'confirmed' ? 'The operator confirmed ' + requestId + ' \u2014 your aircraft is locked in.'
       : next === 'completed' ? requestId + ' is marked complete. How was it? Leave a review to help other travelers.'
-      : requestId + ' was cancelled.';
+      : requestId + ' was cancelled.' + (refunded ? ' Your deposit is refunded in full.' : '');
     const update = { kicker: 'TRIP UPDATE', title: label, rows: [
       ['Trip', requestId], ['Route', routeOfLegs(req.type, JSON.parse(req.legs || '[]'))], ['Status', next.charAt(0).toUpperCase() + next.slice(1)],
     ] };

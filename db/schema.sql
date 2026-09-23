@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
   org_role TEXT,                      -- operators: 'admin' | 'member'
   session_epoch INTEGER NOT NULL DEFAULT 0,  -- bump to invalidate all sessions (password change)
   is_staff INTEGER NOT NULL DEFAULT 0,       -- Chartavia team: sees the concierge desk and any trip document
+  terms_version TEXT,                        -- Terms of Service version accepted at sign-up (TERMS_VERSION in worker.js)
+  terms_at TEXT,                             -- when that version was accepted
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Terms of Service · Chartavia</title>
+  <meta name="description" content="The terms for using Chartavia, the private charter marketplace, including our air charter broker disclosures.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#16233b">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue: #2E6BE6; --blue-dark: #2459c9; --navy: #16233b; --sky-wash: #eef3fd; --slate: #4a5a76;
+      --gold: #c6a667; --gold-ink: #8a6b2e; --gold-soft: #dcc48f; --ivory: #f8f6f1;
+      --mist: #68758d; --line: #e8e3d9;
+      --display: 'Quicksand', 'Albert Sans', -apple-system, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Albert Sans', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--navy); background: var(--ivory); }
+    a { text-decoration: none; color: inherit; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+    /* nav, as on the landing page */
+    .nav { position: sticky; top: 0; z-index: 100; background: rgba(248,246,241,.92); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(232,227,217,.9); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-mark { display: flex; }
+    .logo-mark svg { width: 34px; height: 34px; display: block; }
+    .logo-word { display: flex; color: var(--navy); }
+    .logo-word svg { display: block; }
+    .nav-links { display: flex; gap: 26px; font-family: var(--display); font-size: 14.5px; font-weight: 700; color: var(--slate); }
+    .nav-links a { padding: 4px 0; }
+    .nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--navy); }
+    .nav-links a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--gold); }
+    .nav-cta { display: flex; gap: 10px; align-items: center; }
+    .btn { display: inline-block; border-radius: 999px; font-family: var(--display); font-weight: 700; cursor: pointer; transition: transform .12s, background .15s; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-ghost { padding: 9px 16px; font-size: 14px; color: var(--navy); border: 1.5px solid var(--line); background: #fff; }
+    .btn-primary { padding: 10px 18px; font-size: 14px; color: #fff; background: var(--blue); box-shadow: 0 6px 18px rgba(46,107,230,.28); }
+    .btn-primary:hover { background: var(--blue-dark); }
+
+    /* page head */
+    .legal-head { background: var(--navy); color: #fff; border-bottom: 1px solid rgba(198,166,103,.45); }
+    .legal-head .wrap { padding-top: 60px; padding-bottom: 52px; }
+    .kicker { display: flex; align-items: center; gap: 12px; font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: 3px; color: var(--gold-soft); }
+    .kicker::before { content: ''; width: 28px; height: 1px; background: var(--gold); }
+    .legal-head h1 { font-family: var(--display); font-size: 46px; line-height: 1.08; letter-spacing: -1.2px; margin-top: 14px; }
+    .updated { margin-top: 12px; font-size: 14px; color: #aebbd6; }
+    .lede { margin-top: 20px; max-width: 760px; font-size: 17px; line-height: 1.7; color: #dfe7f5; }
+    .lede a { color: #fff; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,.45); }
+
+    /* body */
+    .legal-body { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 64px; padding-top: 52px; padding-bottom: 80px; }
+    .toc { position: sticky; top: 92px; align-self: start; max-height: calc(100vh - 116px); overflow-y: auto; padding-right: 6px; }
+    .toc-title { font-family: var(--display); font-size: 11.5px; font-weight: 700; letter-spacing: 2.2px; color: var(--gold-ink); margin-bottom: 12px; }
+    .toc ol, .toc-mobile ol { list-style: none; }
+    .toc a { display: block; padding: 6px 0 6px 14px; border-left: 2px solid var(--line); font-size: 13.5px; line-height: 1.35; font-weight: 600; color: var(--mist); }
+    .toc a:hover { color: var(--navy); border-left-color: var(--gold); }
+    .toc-mobile { display: none; }
+    .doc { max-width: 760px; min-width: 0; }
+    .doc section { scroll-margin-top: 88px; margin-bottom: 42px; }
+    .doc h2 { font-family: var(--display); font-size: 25px; line-height: 1.2; letter-spacing: -.3px; margin-bottom: 14px; }
+    .doc h2 .num { color: var(--gold-ink); margin-right: 8px; }
+    .doc h3 { font-size: 16.5px; font-weight: 700; margin: 24px 0 8px; }
+    .doc p, .doc li { font-size: 15.5px; line-height: 1.75; color: var(--slate); }
+    .doc p + p, .doc ul + p, .doc p + ul { margin-top: 12px; }
+    .doc ul { padding-left: 20px; }
+    .doc li + li { margin-top: 8px; }
+    .doc li::marker { color: var(--gold); }
+    .doc a { color: var(--blue); font-weight: 600; }
+    .doc a:hover { text-decoration: underline; }
+    .doc strong { color: var(--navy); font-weight: 700; }
+    .doc code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--navy); }
+    .callout { background: #fff; border: 1.5px solid var(--line); border-left: 4px solid var(--gold); border-radius: 16px; padding: 26px 28px; margin-bottom: 46px; box-shadow: 0 12px 34px rgba(22,35,59,.06); scroll-margin-top: 88px; }
+    .callout h2 { font-size: 21px; }
+
+    /* footer */
+    footer { padding: 44px 0 56px; color: var(--mist); font-size: 13.5px; border-top: 1px solid var(--line); }
+    .foot-inner { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .foot-links { display: flex; flex-wrap: wrap; gap: 10px 22px; font-weight: 600; }
+    .foot-links a:hover { color: var(--navy); }
+    .foot-legal { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; line-height: 1.65; color: var(--mist); max-width: 820px; }
+
+    @media (max-width: 960px) {
+      .legal-body { grid-template-columns: 1fr; gap: 0; padding-top: 28px; }
+      .toc { display: none; }
+      .toc-mobile { display: block; margin-bottom: 34px; background: #fff; border: 1.5px solid var(--line); border-radius: 14px; }
+      .toc-mobile summary { cursor: pointer; padding: 15px 18px; font-family: var(--display); font-weight: 700; font-size: 15px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+      .toc-mobile summary::-webkit-details-marker { display: none; }
+      .toc-mobile summary::after { content: '+'; color: var(--gold-ink); font-size: 20px; line-height: 1; }
+      .toc-mobile[open] summary::after { content: '\2013'; }
+      .toc-mobile ol { padding: 0 18px 12px; }
+      .toc-mobile a { display: block; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; font-weight: 600; color: var(--slate); }
+    }
+    @media (max-width: 860px) { .nav-links { display: none; } }
+    @media (max-width: 640px) {
+      .logo { gap: 8px; }
+      .logo-mark svg { width: 30px; height: 30px; }
+      .logo-word svg { height: 13px; width: auto; }
+      .nav-cta { gap: 6px; }
+      .nav-cta .btn { padding: 8px 13px; font-size: 13px; }
+      .wrap { padding: 0 22px; }
+      .legal-head .wrap { padding-top: 42px; padding-bottom: 38px; }
+      .legal-head h1 { font-size: 34px; letter-spacing: -.8px; }
+      .lede { font-size: 16px; }
+      .callout { padding: 22px 20px; }
+      .doc h2 { font-size: 22px; }
+      .doc p, .doc li { font-size: 15px; }
+      .foot-inner { flex-direction: column; align-items: flex-start; gap: 14px; }
+    }
+    @media print {
+      .nav, .toc, .toc-mobile, .foot-links { display: none !important; }
+      body { background: #fff; }
+      .legal-head { background: none; color: var(--navy); border: none; }
+      .legal-head .wrap { padding: 0 0 18px; }
+      .lede, .updated { color: var(--slate); }
+      .lede a { color: var(--navy); }
+      .legal-body { display: block; padding: 0; }
+      .callout { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="/" aria-label="Chartavia home">
+      <span class="logo-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="34" height="34" role="img" aria-label="Chartavia"><rect width="512" height="512" rx="116" fill="#2E6BE6"/><g transform="rotate(45 256 256) translate(256 256) scale(1.04) translate(-256 -262)"><g><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><g transform="translate(512 0) scale(-1 1)"><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><path d="M256,40 C276,70 282,118 282,166 L282,398 C282,432 268,456 256,470 C244,456 230,432 230,398 L230,166 C230,118 236,70 256,40 Z" fill="#fff"/></g></svg></span>
+      <span class="logo-word"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 823.94 100" width="123.59" height="15" role="img" aria-label="Chartavia"><g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 0)"><path d="M82.94,22.36 A43,43 0 1 0 82.94,77.64"/></g><g transform="translate(113.94 0)"><path d="M7,7 V93"/><path d="M73,7 V93"/><path d="M7,50 H73"/></g><g transform="translate(213.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(321.94 0)"><path d="M7,93 V7 H42 A24.5,24.5 0 0 1 42,56 H7"/><path d="M36,56 L71,93"/></g><g transform="translate(417.94 0)"><path d="M7,7 H75"/><path d="M41,7 V93"/></g><g transform="translate(505.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(597.94 0)"><path d="M7,7 L45,93 L83,7"/></g><g transform="translate(703.94 0)"><path d="M7,7 V93"/></g><g transform="translate(733.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g></g></svg></span>
+    </a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/terms" aria-current="page">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/concierge">Contact</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="https://slipstream.chandler-850.workers.dev/login">Sign in</a>
+      <a class="btn btn-primary" href="https://slipstream.chandler-850.workers.dev/register">Get started</a>
+    </div>
+  </div>
+</nav>
+
+<header class="legal-head">
+  <div class="wrap">
+    <div class="kicker">LEGAL</div>
+    <h1>Terms of Service</h1>
+    <p class="updated">Last updated September 23, 2026</p>
+    <p class="lede">These Terms of Service are an agreement between you and Sapphire Productions, LLC, a Florida limited liability company that operates Chartavia (“Chartavia,” “we,” “us” or “our”). They cover the Chartavia website, web app, emails and related services. By creating an account or using Chartavia, you agree to these Terms. Our <a href="/privacy">Privacy Policy</a> explains how we handle personal information.</p>
+  </div>
+</header>
+
+<main class="wrap legal-body">
+  <nav class="toc" aria-label="Contents">
+    <div class="toc-title">CONTENTS</div>
+    <ol><li><a href="#broker">Air charter broker disclosures</a></li><li><a href="#service">1. What Chartavia does</a></li><li><a href="#accounts">2. Your account</a></li><li><a href="#travelers">3. Requesting a charter</a></li><li><a href="#operators">4. Quoting as an operator</a></li><li><a href="#billing">5. Early access and billing</a></li><li><a href="#verification">6. How we check operators</a></li><li><a href="#reviews">7. Reviews</a></li><li><a href="#conduct">8. Rules of conduct</a></li><li><a href="#content">9. Your content</a></li><li><a href="#ours">10. Our service</a></li><li><a href="#termination">11. Suspending and closing accounts</a></li><li><a href="#disclaimers">12. Disclaimers</a></li><li><a href="#liability">13. Limits of liability</a></li><li><a href="#indemnity">14. Indemnity</a></li><li><a href="#disputes">15. Disputes and governing law</a></li><li><a href="#changes">16. Changes to these Terms</a></li><li><a href="#demo">17. The interactive demo</a></li><li><a href="#general">18. General terms</a></li><li><a href="#contact">19. Contact us</a></li></ol>
+  </nav>
+  <div class="doc">
+    <details class="toc-mobile"><summary>Contents</summary><ol><li><a href="#broker">Air charter broker disclosures</a></li><li><a href="#service">1. What Chartavia does</a></li><li><a href="#accounts">2. Your account</a></li><li><a href="#travelers">3. Requesting a charter</a></li><li><a href="#operators">4. Quoting as an operator</a></li><li><a href="#billing">5. Early access and billing</a></li><li><a href="#verification">6. How we check operators</a></li><li><a href="#reviews">7. Reviews</a></li><li><a href="#conduct">8. Rules of conduct</a></li><li><a href="#content">9. Your content</a></li><li><a href="#ours">10. Our service</a></li><li><a href="#termination">11. Suspending and closing accounts</a></li><li><a href="#disclaimers">12. Disclaimers</a></li><li><a href="#liability">13. Limits of liability</a></li><li><a href="#indemnity">14. Indemnity</a></li><li><a href="#disputes">15. Disputes and governing law</a></li><li><a href="#changes">16. Changes to these Terms</a></li><li><a href="#demo">17. The interactive demo</a></li><li><a href="#general">18. General terms</a></li><li><a href="#contact">19. Contact us</a></li></ol></details>
+
+    <div class="callout" id="broker">
+      <h2>Air charter broker disclosures</h2>
+      <p><strong>Chartavia is an air charter broker, not a direct air carrier.</strong> We don't own or operate aircraft, and we never have operational control of any flight. Every flight arranged through Chartavia is provided by a properly licensed direct air carrier: an operator that holds an FAA air carrier certificate for on-demand operations under Part 135 and keeps full operational control of its flights.</p>
+      <ul>
+      <li><strong>The capacity we act in.</strong> We act as an independent broker. We introduce travelers to operators and provide the tools to request, compare and accept offers. We don't buy or resell air transportation, we don't sign charter agreements for anyone, and we aren't a party to the charter agreement between a traveler and an operator.</li>
+      <li><strong>Who operates your flight.</strong> When you accept an offer, we show you the name of the operator and its aircraft before you sign that operator's charter agreement.</li>
+      <li><strong>Insurance.</strong> Chartavia does not hold liability insurance covering flights arranged through Chartavia. Operators carry the insurance that federal law requires of air carriers.</li>
+      <li><strong>On request.</strong> Before you book, we'll tell you on request about any business relationship between Chartavia and an operator quoting your trip, the total you pay to or through Chartavia, and the third-party fees the operator will charge you directly.</li>
+      </ul>
+    </div>
+
+      <section id="service">
+        <h2><span class="num">1.</span>What Chartavia does</h2>
+        <p>Chartavia is a marketplace for private charter flights. Travelers post trip requests. Charter operators review those requests and send sealed offers, which other operators can't see. A traveler compares the offers, accepts one, and books the flight directly with that operator. Operators can also list empty legs, which are repositioning flights offered at a discount.</p>
+        <p>We provide the software, run the operator checks described in <a href="#verification">section 6</a>, and help when something goes wrong. The operator you book with is responsible for your flight, including the aircraft, crew, safety, schedule, price and compliance with aviation law.</p>
+      </section>
+
+      <section id="accounts">
+        <h2><span class="num">2.</span>Your account</h2>
+        <ul>
+        <li>You must be at least 18 years old and able to form a binding contract. If you use Chartavia for a company or a group of travelers, you confirm that you're authorized to act for them.</li>
+        <li>Give accurate information and keep it up to date. Each account is for one person.</li>
+        <li>Keep your password secret. You're responsible for what happens under your account, so tell us right away if you think someone else has used it.</li>
+        <li>An operator's first account administers that operator's team. Administrators can invite team members with invite codes, and anything a team member does in Chartavia is done on behalf of that operator.</li>
+        </ul>
+      </section>
+
+      <section id="travelers">
+        <h2><span class="num">3.</span>Requesting a charter</h2>
+        <h3>3.1 Your request</h3>
+        <p>Describe your trip accurately, including the route, dates, number of passengers, baggage, pets, medical equipment, accessibility needs and anything else an operator needs to plan a safe flight. Operators price and plan from what you tell them. If details turn out to be wrong, an operator may change or withdraw its offer.</p>
+        <h3>3.2 What operators see</h3>
+        <p>Operators who can quote your trip see the request details you enter. Until you accept an offer, they see you only by your first name and last initial, and never your email address.</p>
+        <h3 id="deposits">3.3 Deposits</h3>
+        <ul>
+        <li>Your first request is free. After that, each request needs a refundable deposit unless you're a Chartavia Plus member. We show the amount before you post. It depends on the largest aircraft category in your request and currently ranges from $150 to $500.</li>
+        <li>We refund your deposit in full if you close the request without accepting an offer, if no operator makes an offer within 72 hours, in which case the request closes automatically, or if, after you accept, the operator cancels the trip or the flight can't be operated for reasons that aren't your fault.</li>
+        <li>When you accept an offer, your deposit becomes Chartavia's fee for arranging the trip. It isn't refunded if you later cancel the trip yourself, unless the law requires a refund.</li>
+        <li>Refunds go back to your original payment method. We make them promptly and within the time limits the law sets.</li>
+        </ul>
+        <h3>3.4 Offers</h3>
+        <p>Each offer comes from an operator and shows the aircraft, the price and how long the offer stays open. Operators set their own prices. Chartavia doesn't set, guarantee or mark up any price. An offer may not include taxes and third-party charges, such as the federal excise tax, segment fees, airport and handling fees, de-icing or crew overnight costs. The operator's charter agreement says what's included.</p>
+        <h3>3.5 Accepting an offer</h3>
+        <p>Accepting an offer tells the operator you want to book it. It shows you the operator's name and aircraft, shows the operator your name, and lets you talk directly in Chartavia's chat. Your flight is booked only when you've signed the operator's charter agreement and the operator has confirmed the trip in Chartavia.</p>
+        <h3>3.6 Paying for your flight</h3>
+        <p>You pay the operator directly under its charter agreement. Chartavia doesn't collect, hold or add anything to the charter price. The operator's agreement governs payment, cancellation charges, changes, delays, baggage and the other terms of the flight.</p>
+        <h3>3.7 Changes and cancellations</h3>
+        <p>Arrange changes and cancellations with the operator under its charter agreement, and mark the trip cancelled in Chartavia. The operator's terms decide any charges on the charter price. Our deposit rules are in <a href="#deposits">section 3.3</a>.</p>
+        <h3>3.8 Empty legs</h3>
+        <p>Empty legs follow the operator's schedule, so they can change or disappear at short notice, even after you ask for one. Requesting an empty leg follows the same steps and rules as any other request.</p>
+        <h3>3.9 Chartavia Plus</h3>
+        <p>Chartavia Plus costs $79 a month and waives the deposit on every request. It renews monthly until you cancel. If you cancel, it stays active until the end of the period you've paid for. We don't refund partial months unless the law requires it.</p>
+      </section>
+
+      <section id="operators">
+        <h2><span class="num">4.</span>Quoting as an operator</h2>
+        <h3>4.1 Who can quote</h3>
+        <p>To send offers or list empty legs, you must:</p>
+        <ul>
+        <li>hold a valid FAA air carrier certificate authorizing on-demand operations under Part 135;</li>
+        <li>hold the economic authority the U.S. Department of Transportation requires for the flights you offer;</li>
+        <li>be a citizen of the United States as defined in 49 U.S.C. 40102(a)(15); and</li>
+        <li>pass the checks described in <a href="#verification">section 6</a>.</li>
+        </ul>
+        <h3>4.2 What you may offer</h3>
+        <p>Offer only flights you are authorized to operate yourself, on aircraft listed in your operations specifications (D085), flown by crews under your control. You may not offer another company's aircraft or act as a broker on Chartavia.</p>
+        <h3>4.3 Your offers</h3>
+        <p>Make every offer accurate and complete: the aircraft you will actually use, the price, what it includes and excludes, and any conditions. An offer is a good-faith commitment for as long as it stays open. If a traveler accepts, send them your charter agreement, confirm the trip in Chartavia once it's booked, and mark it complete after the flight.</p>
+        <h3>4.4 Operational control and safety</h3>
+        <p>You keep full operational control of every flight and make every safety decision. Nothing in Chartavia requires you to operate a flight you consider unsafe or unlawful. If you must cancel, tell the traveler and cancel the trip in Chartavia promptly. When an operator cancels an accepted trip, we refund the traveler's deposit.</p>
+        <h3>4.5 Anonymity until acceptance</h3>
+        <p>Until a traveler accepts your offer, don't put your company name, contact details, website or tail numbers in offers, notes or messages, and don't try to arrange the trip outside Chartavia. We hide contact details we detect, but you're responsible for what you send.</p>
+        <h3>4.6 Keeping your documents current</h3>
+        <p>Keep your certificate, D085 listing, aircraft and safety audit documents current in Chartavia. Tell us promptly if your certificate is suspended or revoked, if an aircraft leaves your operations specifications, or if a safety audit lapses or changes.</p>
+        <h3>4.7 Your agreement with the traveler</h3>
+        <p>Your charter agreement is between you and the traveler. You're responsible for its terms, for collecting payment, for taxes such as the federal excise tax, and for any refunds you owe under it or under the law.</p>
+        <h3>4.8 Empty legs</h3>
+        <p>List only real repositioning flights you intend to operate, and remove a listing as soon as it's no longer available.</p>
+        <h3>4.9 Fees</h3>
+        <p>Joining, quoting and listing on Chartavia are free, and we take no commission on charter payments. Operator Pro costs $299 a month and adds a 15-minute head start on new requests, priority placement in quote lists, unlimited team seats and 20 empty-leg listings. It renews monthly until you cancel and stays active until the end of the period you've paid for.</p>
+        <h3>4.10 Photos and documents</h3>
+        <p>You confirm that you have the rights to the photos and documents you upload. You allow us to show your company profile, aircraft details, photos and verified safety rating to travelers as these Terms describe, and to review your documents as part of our checks.</p>
+      </section>
+
+      <section id="billing">
+        <h2><span class="num">5.</span>Early access and billing</h2>
+        <p>Chartavia is in early access. Deposits and plan prices appear in the app, but we don't charge them yet. Before we begin charging, we will update these Terms, tell you by email or in the app, and ask you to add a payment method. We will never charge you without that authorization. Payments will be handled by a third-party payment processor, and prices will always be shown before you pay.</p>
+      </section>
+
+      <section id="verification">
+        <h2><span class="num">6.</span>How we check operators</h2>
+        <p>Before an operator can send an offer or list an empty leg:</p>
+        <ul>
+        <li><strong>Certificate.</strong> We match its air carrier certificate number against the FAA's published list of Part 135 certificate holders.</li>
+        <li><strong>Aircraft.</strong> We check each tail number against the FAA aircraft registry and against the aircraft the FAA lists on that certificate. An aircraft that isn't listed can be offered only after our staff clear it against the operator's D085.</li>
+        <li><strong>Staff review.</strong> A member of our team reviews the account and its documents.</li>
+        </ul>
+        <p>A safety rating from ARGUS, Wyvern or IS-BAO appears on an operator's offers only after our staff confirm it against the audit certificate, and only until that certificate's expiry date. Reviews come only from travelers whose trips the operator marked complete. Response times are measured from actual timestamps.</p>
+        <p><strong>What our checks can't do.</strong> They rely on public records and documents at a point in time. We don't inspect aircraft, audit operations, check pilots or supervise flights, and a verified badge doesn't guarantee safety. Use your own judgment about any operator. We may decline, suspend or remove an operator at any time if a check fails, a document lapses or we believe travelers could be at risk.</p>
+      </section>
+
+      <section id="reviews">
+        <h2><span class="num">7.</span>Reviews</h2>
+        <p>After an operator marks a trip complete, the traveler can review that operator once for that trip. Reviews must be honest and based on your own experience. Other users see the operator's average rating and number of reviews. We don't edit reviews, but we may remove ones that contain personal information, abuse or content unrelated to the trip, or that we believe are fake. Operators may not offer anything in return for a review or for changing one.</p>
+      </section>
+
+      <section id="conduct">
+        <h2><span class="num">8.</span>Rules of conduct</h2>
+        <p>When using Chartavia, don't:</p>
+        <ul>
+        <li>break the law, or help anyone else break it;</li>
+        <li>offer, request or arrange a flight by anyone who isn't an authorized air carrier, sometimes called illegal charter;</li>
+        <li>give false information, impersonate anyone or claim authority you don't have;</li>
+        <li>harass, threaten or discriminate against anyone;</li>
+        <li>share someone else's personal information without their permission;</li>
+        <li>send spam or unrelated advertising;</li>
+        <li>scrape, copy in bulk or use automated tools to access Chartavia, except through features we provide;</li>
+        <li>probe or attack our systems, or get around security measures, rate limits or the anonymity rules;</li>
+        <li>upload malware, or content you don't have the right to share; or</li>
+        <li>use Chartavia to build a competing service.</li>
+        </ul>
+      </section>
+
+      <section id="content">
+        <h2><span class="num">9.</span>Your content</h2>
+        <p>You keep ownership of what you add to Chartavia, such as requests, offers, messages, reviews, photos and documents. You give Chartavia a worldwide, non-exclusive, royalty-free license to host, store, copy, display and process that content as needed to run and improve Chartavia. The license lasts while the content is on Chartavia, and afterwards for as long as we need to keep backups and records.</p>
+      </section>
+
+      <section id="ours">
+        <h2><span class="num">10.</span>Our service</h2>
+        <p>Chartavia's software, design, text and logos belong to us or our licensors. You may use Chartavia only for its intended purpose and under these Terms. Aircraft and certificate data come from public FAA records. Maps are provided by Mapbox and OpenStreetMap contributors.</p>
+        <p>Chartavia relies on other companies, including our hosting provider, email delivery service, map provider and, once billing starts, a payment processor. We aren't responsible for their services, and their own terms apply when you use them directly.</p>
+      </section>
+
+      <section id="termination">
+        <h2><span class="num">11.</span>Suspending and closing accounts</h2>
+        <p>You can stop using Chartavia at any time and ask us to close your account through our <a href="/concierge">contact page</a>. We may suspend or close an account that breaks these Terms, creates risk for other users or for Chartavia, or when the law requires it. Parts of these Terms that by their nature should continue after an account closes will continue, including those on fees owed, content licenses for records, disclaimers, limits of liability, indemnity and disputes.</p>
+      </section>
+
+      <section id="disclaimers">
+        <h2><span class="num">12.</span>Disclaimers</h2>
+        <p>Chartavia is provided “as is” and “as available.” To the fullest extent the law allows, we disclaim all warranties, express or implied, including warranties of merchantability, fitness for a particular purpose and non-infringement. We don't promise that any operator will quote your trip, that offers will be available at any price, or that Chartavia will always be available or free of errors.</p>
+        <p>Operators are independent businesses, not our employees or agents. We aren't responsible for what they do or fail to do, including flight safety, delays, cancellations, injury, or loss of or damage to property. Nothing in these Terms excludes liability that can't be excluded under applicable law.</p>
+      </section>
+
+      <section id="liability">
+        <h2><span class="num">13.</span>Limits of liability</h2>
+        <p>To the fullest extent the law allows, Chartavia and Sapphire Productions, LLC, and their owners, employees and agents, won't be liable for any indirect, incidental, special, consequential or punitive damages, or for lost profits, revenue, data or goodwill, arising from or related to Chartavia or these Terms. Our total liability for all claims related to Chartavia is limited to the greater of the amount you paid Chartavia in the 12 months before the claim arose, or $100. These limits don't apply where the law doesn't allow them.</p>
+      </section>
+
+      <section id="indemnity">
+        <h2><span class="num">14.</span>Indemnity</h2>
+        <p>You will defend and indemnify Chartavia and Sapphire Productions, LLC against third-party claims, and the resulting losses and reasonable legal costs, that arise from your content, your breach of these Terms or the law, or, if you're an operator, your flights and your agreements with travelers.</p>
+      </section>
+
+      <section id="disputes">
+        <h2><span class="num">15.</span>Disputes and governing law</h2>
+        <p>Florida law governs these Terms and any dispute about Chartavia, without regard to its conflict-of-laws rules, except where federal law applies. Before starting a legal claim, contact us and give us 30 days to try to resolve it informally. If that doesn't work, claims must be brought in the state or federal courts located in Florida, and you and we consent to their jurisdiction. Either of us may bring a qualifying claim in small-claims court instead.</p>
+        <p>Disputes about a flight itself are between the traveler and the operator under their charter agreement. We'll help where we can.</p>
+      </section>
+
+      <section id="changes">
+        <h2><span class="num">16.</span>Changes to these Terms</h2>
+        <p>We may update these Terms as Chartavia changes. We'll post the new version with a new date. For material changes, we'll tell you by email or in the app before they take effect. If you keep using Chartavia after that date, the updated Terms apply to you.</p>
+      </section>
+
+      <section id="demo">
+        <h2><span class="num">17.</span>The interactive demo</h2>
+        <p>Our interactive demo uses fictional operators and travelers, with sample accounts that any visitor can switch between. Nothing booked in the demo is real, sample documents are clearly marked, and demo data is reset from time to time. Don't enter real personal information in the demo.</p>
+      </section>
+
+      <section id="general">
+        <h2><span class="num">18.</span>General terms</h2>
+        <ul>
+        <li>These Terms, our Privacy Policy and any plan terms shown when you subscribe are the entire agreement between you and us about Chartavia.</li>
+        <li>If a court finds part of these Terms unenforceable, the rest stays in effect.</li>
+        <li>If we don't enforce a right, we haven't waived it.</li>
+        <li>You may not transfer these Terms without our written consent. We may transfer them as part of a merger, acquisition or sale of assets.</li>
+        <li>We aren't responsible for delays or failures caused by events beyond our reasonable control.</li>
+        <li>We may send you notices at the email address on your account or in the app. Send notices to us through our <a href="/concierge">contact page</a>.</li>
+        </ul>
+      </section>
+
+      <section id="contact">
+        <h2><span class="num">19.</span>Contact us</h2>
+        <p>Questions about these Terms? Reach us through our <a href="/concierge">contact page</a> and choose “Asking something else.” Chartavia is operated by Sapphire Productions, LLC, a Florida limited liability company.</p>
+      </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-inner">
+      <a class="logo" href="/" aria-label="Chartavia home">
+      <span class="logo-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="30" height="30" role="img" aria-label="Chartavia"><rect width="512" height="512" rx="116" fill="#2E6BE6"/><g transform="rotate(45 256 256) translate(256 256) scale(1.04) translate(-256 -262)"><g><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><g transform="translate(512 0) scale(-1 1)"><polygon points="238,232 70,338 70,366 238,312" fill="#fff"/><rect x="188" y="338" width="30" height="76" rx="15" fill="#A8C4F4"/><polygon points="250,410 170,452 170,470 252,448" fill="#fff"/></g><path d="M256,40 C276,70 282,118 282,166 L282,398 C282,432 268,456 256,470 C244,456 230,432 230,398 L230,166 C230,118 236,70 256,40 Z" fill="#fff"/></g></svg></span>
+      <span class="logo-word"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 823.94 100" width="107.11" height="13" role="img" aria-label="Chartavia"><g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 0)"><path d="M82.94,22.36 A43,43 0 1 0 82.94,77.64"/></g><g transform="translate(113.94 0)"><path d="M7,7 V93"/><path d="M73,7 V93"/><path d="M7,50 H73"/></g><g transform="translate(213.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(321.94 0)"><path d="M7,93 V7 H42 A24.5,24.5 0 0 1 42,56 H7"/><path d="M36,56 L71,93"/></g><g transform="translate(417.94 0)"><path d="M7,7 H75"/><path d="M41,7 V93"/></g><g transform="translate(505.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g><g transform="translate(597.94 0)"><path d="M7,7 L45,93 L83,7"/></g><g transform="translate(703.94 0)"><path d="M7,7 V93"/></g><g transform="translate(733.94 0)"><path d="M7,93 L45,7 L83,93"/><path d="M17.16,70 H72.84"/></g></g></svg></span>
+    </a>
+      <div class="foot-links">
+        <a href="/#how">How it works</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="/concierge">Contact</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="https://slipstream.chandler-850.workers.dev/login">Sign in</a>
+      </div>
+      <div>© 2026 Chartavia</div>
+    </div>
+    <p class="foot-legal">Chartavia is an air charter broker, not a direct air carrier. We don’t operate aircraft or hold operational control of any flight. Every flight is provided by a properly licensed direct air carrier operating under FAA Part 135.</p>
+  </div>
+</footer>
+
+</body>
+</html>

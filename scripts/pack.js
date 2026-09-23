@@ -213,6 +213,15 @@ if (!newTemplate.includes('sc-camel-on-click="{{ toggleMenu }}"')) {
   console.log('applied account-menu markup patch');
 }
 
+// Account menu: Terms of Service and Privacy Policy links above "Log out".
+const LOGOUT_BTN = '<button sc-camel-on-click="{{ doLogout }}"';
+const MENU_LEGAL = '<div style="display:flex;gap:16px;margin-bottom:10px"><a href="/terms" target="_blank" rel="noopener" style="font-size:12px;font-weight:700;color:#4a5a76;text-decoration:none">Terms of Service</a><a href="/privacy" target="_blank" rel="noopener" style="font-size:12px;font-weight:700;color:#4a5a76;text-decoration:none">Privacy Policy</a></div>\n    ';
+if (!newTemplate.includes('href="/terms"')) {
+  if (newTemplate.split(LOGOUT_BTN).length !== 2) throw new Error('logout button not found exactly once — template changed?');
+  newTemplate = newTemplate.replace(LOGOUT_BTN, MENU_LEGAL + LOGOUT_BTN);
+  console.log('applied legal-links patch');
+}
+
 // Operator chat inbox: a MESSAGES section in the bid-desk sidebar listing every
 // conversation (one per quote sent), opening the shared chat drawer.
 const SIDEBAR_ANCHOR = '</sc-for>\n      </div>\n    </div>\n    <div style="overflow-y:auto;padding:22px 26px 60px">';
