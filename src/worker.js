@@ -2192,14 +2192,18 @@ async function apiAcceptQuote(request, env, me, requestId) {
   ).bind(quoteId, requestId).run();
   {
     const winner = await env.DB.prepare(
-      'SELECT q.operator_id, COALESCE(u.org_id, u.id) AS org FROM quotes q JOIN users u ON u.id = q.operator_id WHERE q.id = ?'
+      `SELECT q.operator_id, COALESCE(u.org_id, u.id) AS org, u.name AS operator_name, p.company, p.cert_number, p.cert_faa_name
+       FROM quotes q JOIN users u ON u.id = q.operator_id
+       LEFT JOIN operator_profiles p ON p.user_id = COALESCE(u.org_id, u.id) WHERE q.id = ?`
     ).bind(quoteId).first();
     if (winner) {
       const origin = new URL(request.url).origin;
       const legs = JSON.parse(req.legs || '[]');
       const route = routeOfLegs(req.type, legs);
-      const rows = [['Trip', requestId], ['Route', route], ['First departure', legs[0] ? fmtLegDate(legs[0].date) : ''],
-        ['Passengers', String(req.pax)], ['Price', '$' + Number(quote.price).toLocaleString('en-US')]];
+      const trip = [['Trip', requestId], ['Route', route], ['First departure', legs[0] ? fmtLegDate(legs[0].date) : ''],
+        ['Passengers', String(req.pax)]];
+      const price = ['Price', '$' + Number(quote.price).toLocaleString('en-US')];
+      const rows = [...trip, price];
       const lines = ['Your sealed quote on ' + requestId + ' was accepted. Your identity is now visible to the client.',
         'Open the conversation to coordinate the contract and confirm the trip. A printable trip sheet is linked there.'];
       const won = { kicker: 'TRIP WON', title: 'Your quote was accepted', rows };
@@ -2207,11 +2211,22 @@ async function apiAcceptQuote(request, env, me, requestId) {
       if (winner.org !== winner.operator_id) {
         await notifyUser(env, winner.org, 'Your team won ' + requestId, lines, origin + '/app', 'Open the conversation', won);
       }
+      // The traveler's copy names who flies them, as the offer card and trip
+      // summary do: the FAA certificate holder and its Part 135 certificate
+      // (14 CFR 295.24(a)(1)), plus the name the operator uses on Chartavia.
+      const company = winner.company || winner.operator_name;
+      const [tail, model] = quote.aircraft.includes('|') ? quote.aircraft.split('|') : ['', (FLEET[quote.aircraft] || { name: quote.aircraft }).name];
+      const carrier = winner.cert_faa_name
+        ? 'Your flight is operated by ' + winner.cert_faa_name + (sameName(winner.cert_faa_name, company) ? '' : ', which appears on Chartavia as ' + company + ',')
+          + ' under FAA Part 135 air carrier certificate ' + winner.cert_number + '.'
+        : 'Your flight is operated by ' + company + '.';
       await notifyUser(env, me.id, 'Offer accepted \u2014 ' + requestId,
-        ['Your operator now has your details and will confirm the aircraft. The charter agreement and payment are settled directly with them.',
+        [carrier,
+         'Your operator now has your details and will confirm the aircraft. The charter agreement and payment are settled directly with them.',
          'Your trip summary is ready to view, save as a PDF, or forward.'],
         origin + '/trip/' + requestId, 'View your trip summary',
-        { kicker: 'OFFER ACCEPTED', title: 'You are on your way: ' + route, rows });
+        { kicker: 'OFFER ACCEPTED', title: 'You are on your way: ' + route,
+          rows: [...trip, ['Operator', company], ['Aircraft', tail ? model + ' \u00b7 ' + tail : model], price] });
     }
   }
   return json({ ok: true, acceptedQuoteId: quoteId });
