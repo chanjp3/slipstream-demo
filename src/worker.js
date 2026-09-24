@@ -1718,7 +1718,8 @@ td{padding:12px 10px 12px 0;border-bottom:1px solid var(--line);font-size:14px}
 td.code{font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:15px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:26px 40px}
 .kv div{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px}
-.kv span:first-child{color:var(--mist);flex:none}.kv span:last-child{font-weight:600;text-align:right}
+/* label and value each get up to half the row, plus any room the other leaves unused */
+.kv span{flex:1 1 0;max-width:max-content}.kv span:first-child{color:var(--mist)}.kv span:last-child{font-weight:600;text-align:right;overflow-wrap:anywhere}
 .price{font-family:'Quicksand',sans-serif;font-size:30px;font-weight:700;margin-top:4px}
 .small{font-size:12.5px;color:var(--mist);margin-top:4px;line-height:1.5}
 .note{font-size:14px;color:var(--slate);line-height:1.6;white-space:pre-wrap}
